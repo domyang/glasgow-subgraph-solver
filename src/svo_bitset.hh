@@ -198,6 +198,45 @@ class SVOBitset
 
             return result;
         }
+
+		struct Iterator
+		{
+			using iterator_category = std::forward_iterator_tag;
+			using difference_type = std::ptrdiff_t;
+			using value_type = unsigned;
+			using pointer = unsigned*;
+			using reference = unsigned&;
+
+			Iterator(unsigned p): pos(p), bitset(*this) {}
+			reference operator*() const { return pos; }
+			pointer operator->() { return &pos; }
+
+			Iterator& operator++()
+			{
+				bitset.reset(pos);
+				pos = bitset.find_first();
+				return *this;
+			}
+			
+			Iterator& operator++(int)
+			{
+				bitset.reset(pos);
+				pos = bitset.find_first();
+				return *this;
+			}
+
+			friend bool operator==(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
+
+			friend bool operator!=(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
+
+		private:
+			unsigned pos;
+			SVOBitset bitset;
+		};
+
+		Iterator begin() {pos = find_first(); return Iterator(pos);}
+		Iterator end() {return Iterator(npos);}
+		
 };
 
 #endif
