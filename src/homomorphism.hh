@@ -9,6 +9,7 @@
 #include "restarts.hh"
 #include "timeout.hh"
 #include "value_ordering.hh"
+#include "graph_equivalence.hh"
 #include "vertex_to_vertex_mapping.hh"
 #include "proof-fwd.hh"
 
@@ -106,6 +107,9 @@ struct HomomorphismParams
 
     /// Optional proof handler
     std::unique_ptr<Proof> proof;
+
+    PatternEquivalence pattern_equivalence = PatternEquivalence::None;
+    TargetEquivalence target_equivalence = TargetEquivalence::None;
 };
 
 struct HomomorphismResult

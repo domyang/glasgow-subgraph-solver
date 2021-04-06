@@ -2,6 +2,7 @@
 
 #include "formats/read_file_format.hh"
 #include "homomorphism.hh"
+#include "graph_equivalence.hh"
 #include "sip_decomposer.hh"
 #include "lackey.hh"
 #include "symmetries.hh"
@@ -81,7 +82,9 @@ auto main(int argc, char * argv[]) -> int
             ("luby-constant",        po::value<int>(),         "Specify the starting constant / multiplier for Luby restarts")
             ("value-ordering",       po::value<string>(),      "Specify value-ordering heuristic (biased / degree / antidegree / random)")
             ("pattern-symmetries",                             "Eliminate pattern symmetries (requires Gap)")
-            ("target-symmetries",                              "Eliminate target symmetries (requires Gap)");
+            ("target-symmetries",                              "Eliminate target symmetries (requires Gap)")
+            ("pattern-equivalence",  po::value<string>(),      "Specify equivalence level for pattern (none / structural)")
+            ("target-equivalence",   po::value<string>(),      "Specify equivalence level for target (none / structural / candidate / full / node_cover)");
         display_options.add(search_options);
 
         po::options_description mangling_options{ "Advanced input processing options" };
@@ -252,6 +255,36 @@ auto main(int argc, char * argv[]) -> int
                 params.value_ordering_heuristic = ValueOrdering::Random;
             else {
                 cerr << "Unknown value-ordering heuristic '" << value_ordering_heuristic << "'" << endl;
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (options_vars.count("pattern-equivalence")) {
+            string pattern_equivalence = options_vars["pattern-equivalnece"].as<string>();
+            if (pattern_equivalence == "none")
+                params.pattern_equivalence = PatternEquivalence::None;
+            else if (pattern_equivalence == "structural")
+                params.pattern_equivalence = PatternEquivalence::Structural;
+            else {
+                cerr << "Unknown pattern equivalence '" << pattern_equivalence << "'" << endl;
+                return EXIT_FAILURE;
+            }
+        }
+
+        if (options_vars.count("target-equivalnece")) {
+            string target_equivalence = options_vars["target-equivalence"].as<string>();
+            if (target_equivalence == "none")
+                params.target_equivalence = TargetEquivalence::None;
+            else if (target_equivalence == "structural")
+                params.target_equivalence = TargetEquivalence::Structural;
+            else if (target_equivalence == "candidate")
+                params.target_equivalence = TargetEquivalence::Candidate;
+            else if (target_equivalence == "full")
+                params.target_equivalence = TargetEquivalence::Full;
+            else if (target_equivalence == "node_cover")
+                params.target_equivalence = TargetEquivalence::NodeCover;
+            else {
+                cerr << "Unknown target equivalence '" << target_equivalence << "'" << endl;
                 return EXIT_FAILURE;
             }
         }
