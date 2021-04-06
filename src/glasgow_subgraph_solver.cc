@@ -260,7 +260,7 @@ auto main(int argc, char * argv[]) -> int
         }
 
         if (options_vars.count("pattern-equivalence")) {
-            string pattern_equivalence = options_vars["pattern-equivalnece"].as<string>();
+            string pattern_equivalence = options_vars["pattern-equivalence"].as<string>();
             if (pattern_equivalence == "none")
                 params.pattern_equivalence = PatternEquivalence::None;
             else if (pattern_equivalence == "structural")
@@ -271,7 +271,7 @@ auto main(int argc, char * argv[]) -> int
             }
         }
 
-        if (options_vars.count("target-equivalnece")) {
+        if (options_vars.count("target-equivalence")) {
             string target_equivalence = options_vars["target-equivalence"].as<string>();
             if (target_equivalence == "none")
                 params.target_equivalence = TargetEquivalence::None;
