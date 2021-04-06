@@ -8,6 +8,7 @@
 #include "homomorphism.hh"
 #include "homomorphism_domain.hh"
 #include "proof.hh"
+#include "equivalence.hh"
 
 #include <memory>
 
@@ -23,6 +24,8 @@ class HomomorphismModel
         auto _build_distance3_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
 
         auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
+
+        auto _build_equivalence() -> void;
 
         auto _check_degree_compatibility(
                 int p,
@@ -57,6 +60,10 @@ class HomomorphismModel
 
         auto pattern_adjacency_bits(int p, int q) const -> PatternAdjacencyBitsType;
         auto pattern_graph_row(int g, int p) const -> const SVOBitset &;
+
+        auto forward_pattern_graph_row(int t) const -> const SVOBitset &;
+        auto reverse_pattern_graph_row(int t) const -> const SVOBitset &;
+
         auto target_graph_row(int g, int t) const -> const SVOBitset &;
 
         auto forward_target_graph_row(int t) const -> const SVOBitset &;
@@ -76,6 +83,9 @@ class HomomorphismModel
 
         auto pattern_has_loop(int p) const -> bool;
         auto target_has_loop(int t) const -> bool;
+
+		auto is_pattern_equivalent(int p, int q) const -> bool;
+		auto is_target_equivalent(int p, int q) const -> bool;
 
         auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
 };
