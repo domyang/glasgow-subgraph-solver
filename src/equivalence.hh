@@ -5,29 +5,72 @@
 
 class DisjointSet
 {
-		private:
-				unsigned count;
-				std::vector<int> parents;
-				// For performing union by size
-				std::vector<int> sizes;
+	private:
+		unsigned count;
+		std::vector<unsigned> parents;
+		// For performing union by size
+		std::vector<int> sizes;
 
-		public:
-				DisjointSet(unsigned n): count(n), parents(), sizes(n, 1)
-				{
-						parents.reserve(n);
-						for (unsigned i = 0; i < n; i++)
-								parents.push_back(i);
-				}
+	public:
+		DisjointSet(): count(0), parents(), sizes() {}
 
-				/*
-				 * Find representative for equivalence class
-				 */
-				unsigned find(unsigned);
+		DisjointSet(unsigned n): count(n), parents(), sizes(n, 1)
+		{
+			parents.reserve(n);
+			for (unsigned i = 0; i < n; i++)
+				parents.push_back(i);
+		}
 
-				/*
-				 * Merge two equivalence classes together
-				 */
-				void merge(unsigned, unsigned);
-}
+		void add_elems(unsigned n)
+		{
+			count = n;
+			parents.reserve(n);
+			sizes.reserve(n);
+			for (unsigned i = 0; i < n; i++)
+			{
+				parents.push_back(i);
+				sizes.push_back(1);
+			}
+		}
+
+		/*
+		 * Find representative for equivalence class
+		 */
+		unsigned find(unsigned x)
+        {
+            // Traverse up until the root
+            unsigned root = x;
+            while (parents[root] != root)
+                root = parents[root];
+
+            // Path Compression
+            while (parents[x] != root)
+            {
+                unsigned parent = parents[x];
+                parents[x] = root;
+                sizes[x] = 1;
+                x = parent;
+            }
+
+            return root;
+        }
+
+		/*
+		 * Merge two equivalence classes together
+		 */
+		void merge(unsigned x, unsigned y)
+        {
+            unsigned x_root = find(x);
+            unsigned y_root = find(y);
+            if (x_root != y_root)
+            {
+                if (sizes[x_root] < sizes[y_root])
+                    std::swap(x_root, y_root);
+
+                parents[y_root] = x_root;
+                sizes[x_root] = sizes[x_root] + sizes[y_root];
+            }
+        }
+};
 
 #endif
