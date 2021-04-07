@@ -2,6 +2,7 @@
 
 #include "homomorphism_searcher.hh"
 #include "cheap_all_different.hh"
+#include "graph_equivalence.hh"
 
 #include <optional>
 
@@ -69,7 +70,7 @@ auto HomomorphismSearcher::save_result(const HomomorphismAssignments & assignmen
 
 auto HomomorphismSearcher::restarting_search(
         HomomorphismAssignments & assignments,
-        const Domains & domains,
+        Domains & domains,
         unsigned long long & nodes,
         unsigned long long & propagations,
         loooong & solution_count,
@@ -82,7 +83,7 @@ auto HomomorphismSearcher::restarting_search(
     ++nodes;
 
     // find ourselves a domain, or succeed if we're all assigned
-    const HomomorphismDomain * branch_domain = find_branch_domain(domains);
+    HomomorphismDomain * branch_domain = find_branch_domain(domains);
     if (! branch_domain) {
         if (params.lackey) {
             VertexToVertexMapping mapping;
@@ -105,7 +106,11 @@ auto HomomorphismSearcher::restarting_search(
         if (params.count_solutions) {
             // we could be finding duplicate solutions, in threaded search
             if (_duplicate_solution_filterer(assignments)) {
-                ++solution_count;
+				if (params.pattern_equivalence == PatternEquivalence::Structural)
+					solution_count += model.pattern_equivalence_multiplier();
+				else
+                	++solution_count;
+
                 if (params.enumerate_callback) {
                     VertexToVertexMapping mapping;
                     expand_to_full_result(assignments, mapping);
@@ -217,6 +222,7 @@ auto HomomorphismSearcher::restarting_search(
 
                 // restore assignments
                 assignments.values.resize(assignments_size);
+
                 break;
 
             case SearchResult::UnsatisfiableAndBackjumpUsingLackey:
@@ -235,6 +241,13 @@ auto HomomorphismSearcher::restarting_search(
                 actually_hit_a_failure = true;
                 break;
         }
+		if (params.pattern_equivalence == PatternEquivalence::Structural)
+			// Eliminate f_v from domain of all pattern equivalent vertices.
+			for (auto &d : domains)
+				if ((d.v != branch_domain->v) 
+					&& (model.is_pattern_equivalent(d.v, branch_domain->v)))
+					d.values.reset(*f_v);
+
 
         ++discrepancy_count;
     }
@@ -345,9 +358,9 @@ auto HomomorphismSearcher::copy_nonfixed_domains_and_make_assignment(
     return new_domains;
 }
 
-auto HomomorphismSearcher::find_branch_domain(const Domains & domains) -> const HomomorphismDomain *
+auto HomomorphismSearcher::find_branch_domain(Domains & domains) -> HomomorphismDomain *
 {
-    const HomomorphismDomain * result = nullptr;
+    HomomorphismDomain * result = nullptr;
     for (auto & d : domains)
         if (! d.fixed)
             if ((! result) ||

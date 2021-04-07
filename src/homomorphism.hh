@@ -108,7 +108,10 @@ struct HomomorphismParams
     /// Optional proof handler
     std::unique_ptr<Proof> proof;
 
+    // Level of pattern equivalence
     PatternEquivalence pattern_equivalence = PatternEquivalence::None;
+
+    // Level of target equivalence
     TargetEquivalence target_equivalence = TargetEquivalence::None;
 };
 

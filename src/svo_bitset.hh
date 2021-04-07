@@ -125,12 +125,12 @@ class SVOBitset
 
         auto find_first_after(int a) const -> unsigned
         {
-						unsigned start = a / bits_per_word;
-						unsigned offset = a % bits_per_word;
+			unsigned start = a / bits_per_word;
+			unsigned offset = a % bits_per_word + 1;
             if (! _is_long()) {
-								int x = __builtin_ffsll(_data.short_data[start] >> offset);
-								if (x != 0)
-										return start * bits_per_word + x + offset - 1;
+                int x = __builtin_ffsll(_data.short_data[start] >> offset);
+                if (x != 0)
+                        return start * bits_per_word + x + offset - 1;
                 for (unsigned i = start + 1 ; i < n_words ; ++i) {
                     x = __builtin_ffsll(_data.short_data[i]);
                     if (0 != x)
@@ -139,9 +139,9 @@ class SVOBitset
                 return npos;
             }
             else {
-								int x = __builtin_ffsll(_data.long_data[start] >> offset);
-								if (x != 0)
-										return start * bits_per_word + x + offset - 1;
+                int x = __builtin_ffsll(_data.long_data[start] >> offset);
+                if (x != 0)
+                        return start * bits_per_word + x + offset - 1;
                 for (unsigned i = start+1, i_end = n_words ; i < i_end ; ++i) {
                     x = __builtin_ffsll(_data.long_data[i]);
                     if (0 != x)
@@ -227,30 +227,30 @@ class SVOBitset
             return result;
         }
 
-				struct Iterator
-				{
-					using iterator_category = std::forward_iterator_tag;
-					using difference_type = std::ptrdiff_t;
-					using value_type = unsigned;
-					using pointer = unsigned*;
-					using reference = unsigned&;
+        struct Iterator
+        {
+            using iterator_category = std::forward_iterator_tag;
+            using difference_type = std::ptrdiff_t;
+            using value_type = unsigned;
+            using pointer = unsigned*;
+            using reference = unsigned&;
 
-					Iterator(SVOBitset& set, unsigned p): bitset(set), pos(p) {}
-					reference operator*() { return pos; }
-					pointer operator->() { return &pos; }
+            Iterator(SVOBitset& set, unsigned p): bitset(set), pos(p) {}
+            reference operator*() { return pos; }
+            pointer operator->() { return &pos; }
 
-					Iterator& operator++() {pos = bitset.find_first_after(pos); return *this;}
-					Iterator& operator++(int) {pos = bitset.find_first_after(pos); return *this;}
-					friend bool operator==(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
-					friend bool operator!=(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
+            Iterator& operator++() {pos = bitset.find_first_after(pos); return *this;}
+            Iterator& operator++(int) {pos = bitset.find_first_after(pos); return *this;}
+            friend bool operator==(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
+            friend bool operator!=(const Iterator& a, const Iterator& b){return a.pos != b.pos;}
 
-				private:
-					SVOBitset& bitset;
-					unsigned pos;
-				};
+        private:
+            SVOBitset& bitset;
+            unsigned pos;
+        };
 
-				Iterator begin() {int pos = find_first(); return Iterator(*this, pos);}
-				Iterator end() {return Iterator(*this, npos);}
+        Iterator begin() {int pos = find_first(); return Iterator(*this, pos);}
+        Iterator end() {return Iterator(*this, npos);}
 		
 };
 

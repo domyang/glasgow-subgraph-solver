@@ -8,6 +8,7 @@
 #include "homomorphism.hh"
 #include "homomorphism_domain.hh"
 #include "proof.hh"
+#include "loooong.hh"
 #include "equivalence.hh"
 
 #include <memory>
@@ -25,7 +26,7 @@ class HomomorphismModel
 
         auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
 
-        auto _build_equivalence() -> void;
+        auto _build_pattern_equivalence() -> void;
 
         auto _check_degree_compatibility(
                 int p,
@@ -39,6 +40,8 @@ class HomomorphismModel
         auto _check_loop_compatibility(int p, int t) const -> bool;
 
         auto _check_label_compatibility(int p, int t) const -> bool;
+
+		auto _is_pattern_equivalent(int p, int q) const -> bool;
 
     public:
         using PatternAdjacencyBitsType = uint8_t;
@@ -86,6 +89,8 @@ class HomomorphismModel
 
 		auto is_pattern_equivalent(int p, int q) const -> bool;
 		auto is_target_equivalent(int p, int q) const -> bool;
+
+		auto pattern_equivalence_multiplier() const -> loooong;
 
         auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
 };

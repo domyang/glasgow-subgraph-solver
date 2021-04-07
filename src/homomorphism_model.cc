@@ -4,6 +4,8 @@
 #include "homomorphism_traits.hh"
 #include "configuration.hh"
 #include "equivalence.hh"
+#include "loooong.hh"
+#include "graph_equivalence.hh"
 
 #include <functional>
 #include <queue>
@@ -52,8 +54,8 @@ struct HomomorphismModel::Imp
     vector<int> pattern_vertex_labels, target_vertex_labels, pattern_edge_labels, target_edge_labels;
     vector<int> pattern_loops, target_loops;
 
-	DisjointSet pattern_equivalence;
-	DisjointSet target_equivalence;
+    DisjointSet pattern_equivalence;
+    DisjointSet target_equivalence;
 
     vector<string> pattern_vertex_proof_names, target_vertex_proof_names;
 
@@ -676,6 +678,9 @@ auto HomomorphismModel::prepare() -> bool
                 if (_imp->pattern_graph_rows[i * max_graphs + g].test(j))
                     _imp->pattern_adjacencies_bits[i * pattern_size + j] |= (1u << g);
 
+    if (_imp->params.pattern_equivalence == PatternEquivalence::Structural)
+        _build_pattern_equivalence();
+
     return true;
 }
 
@@ -872,126 +877,152 @@ auto HomomorphismModel::directed() const -> bool
     return _imp->directed;
 }
 
-auto HomomorphismModel::is_pattern_equivalent(int x, int y) const -> bool
+// Function which checks the actual equivalence criterion, i.e.,
+// whether or not the vertices have the same neighbor.
+auto HomomorphismModel::_is_pattern_equivalent(int x, int y) const -> bool
 {
-	auto nx = pattern_graph_row(0, x);
-	auto ny = pattern_graph_row(0, y);
-	
-	// Both must have or not have loops
-	if (pattern_has_loop(x) != pattern_has_loop(y))
-		return false;
+    auto nx = pattern_graph_row(0, x);
+    auto ny = pattern_graph_row(0, y);
+    
+    // Both must have or not have loops
+    if (pattern_has_loop(x) != pattern_has_loop(y))
+        return false;
 
-	if (has_vertex_labels())
-		// Vertex labels must match
-		if (pattern_vertex_label(x) != pattern_vertex_label(y))
-			return false;
+    if (has_vertex_labels())
+        // Vertex labels must match
+        if (pattern_vertex_label(x) != pattern_vertex_label(y))
+            return false;
 
-	if (!directed())
-	{
-		// If after anding the bitsets, the result is different, 
-		// they are not equivalent.
-		nx.reset(y);
-		ny.reset(x);
-		unsigned neighbor_count = nx.count();
-		nx &= ny;
-		if (neighbor_count != nx.count())
-			return false;
+    if (!directed())
+    {
+        // If after anding the bitsets, the result is different, 
+        // they are not equivalent.
+        nx.reset(y);
+        ny.reset(x);
+        unsigned neighbor_count = nx.count();
+        nx &= ny;
+        if (neighbor_count != nx.count())
+            return false;
 
-		// Otherwise, they have the same neighbors, we check the edge labels now
-		if (has_edge_labels())
-		  	for (auto w: nx)
-				if (pattern_edge_label(x, w) != pattern_edge_label(y, w))
-					return false;
-	}
-	else
-	{
-		// Check if x,y either fully connected or disconnected
-		if (nx.test(y) != ny.test(x))
-			return false;
+        // Otherwise, they have the same neighbors, we check the edge labels now
+        if (has_edge_labels())
+            for (auto w: nx)
+                if (pattern_edge_label(x, w) != pattern_edge_label(y, w))
+                    return false;
+    }
+    else
+    {
+        // Check if x,y either fully connected or disconnected
+        if (nx.test(y) != ny.test(x))
+            return false;
 
-		// Check that the labels match
-		if (nx.test(y) && has_edge_labels())
-			if (pattern_edge_label(x, y) != pattern_edge_label(y, x))
-				return false;
+        // Check that the labels match
+        if (nx.test(y) && has_edge_labels())
+            if (pattern_edge_label(x, y) != pattern_edge_label(y, x))
+                return false;
 
-		// Resetting connections between x and y, so we can just check connections
-		// to other vertices
-		auto n_out_x = forward_pattern_graph_row(x);
-		n_out_x.reset(y);
-		auto n_in_x = reverse_pattern_graph_row(x);
-		n_in_x.reset(y);
+        // Resetting connections between x and y, so we can just check connections
+        // to other vertices
+        auto n_out_x = forward_pattern_graph_row(x);
+        n_out_x.reset(y);
+        auto n_in_x = reverse_pattern_graph_row(x);
+        n_in_x.reset(y);
 
-		auto n_out_y = forward_pattern_graph_row(y);
-		n_out_y.reset(x);
-		auto n_in_y = reverse_pattern_graph_row(y);
-		n_in_y.reset(x);
+        auto n_out_y = forward_pattern_graph_row(y);
+        n_out_y.reset(x);
+        auto n_in_y = reverse_pattern_graph_row(y);
+        n_in_y.reset(x);
 
-		// Check if have the same set of in neighbors and out neighbors
-		unsigned out_neighbor_count = n_out_x.count();
-		n_out_x &= n_out_y;
-		if (out_neighbor_count != n_out_x.count())
-			return false;
+        // Check if have the same set of in neighbors and out neighbors
+        unsigned out_neighbor_count = n_out_x.count();
+        n_out_x &= n_out_y;
+        if (out_neighbor_count != n_out_x.count())
+            return false;
 
-		unsigned in_neighbor_count = n_in_x.count();
-		n_in_x &= n_out_y;
-		if (in_neighbor_count != n_in_x.count())
-			return false;
+        unsigned in_neighbor_count = n_in_x.count();
+        n_in_x &= n_out_y;
+        if (in_neighbor_count != n_in_x.count())
+            return false;
 
-		// Otherwise, they have the same neighbors, we check the edge labels now
-		if (has_edge_labels())
-		{
-		  	for (auto w: n_in_x)
-				if (pattern_edge_label(w, x) != pattern_edge_label(w, y))
-					return false;
+        // Otherwise, they have the same neighbors, we check the edge labels now
+        if (has_edge_labels())
+        {
+            for (auto w: n_in_x)
+                if (pattern_edge_label(w, x) != pattern_edge_label(w, y))
+                    return false;
 
-		  	for (auto w: n_out_x)
-				if (pattern_edge_label(x, w) != pattern_edge_label(y, w))
-					return false;
-		}
-	}
-	return true;
+            for (auto w: n_out_x)
+                if (pattern_edge_label(x, w) != pattern_edge_label(y, w))
+                    return false;
+        }
+    }
+    return true;
 }
 
-auto HomomorphismModel::_build_equivalence() -> void
+auto HomomorphismModel::_build_pattern_equivalence() -> void
 {
-	std::vector<bool> visited(pattern_size, false);
-	std::queue<unsigned> queue;
-	_imp->pattern_equivalence.add_elems(pattern_size);
-	
-	for (unsigned i = 0; i < pattern_size; i++)
-	{
-		if (visited[i])
-			continue;
-		queue.push(i);
+    std::vector<bool> visited(pattern_size, false);
+    std::queue<unsigned> queue;
+    _imp->pattern_equivalence.add_elems(pattern_size);
+    
+    for (unsigned i = 0; i < pattern_size; i++)
+    {
+        if (visited[i])
+            continue;
+        queue.push(i);
 
-		while (!queue.empty())
-		{
-			unsigned curr_vert = queue.front();
-			queue.pop();
-			visited[curr_vert] = true;
+        while (!queue.empty())
+        {
+            unsigned curr_vert = queue.front();
+            queue.pop();
+            visited[curr_vert] = true;
 
-			SVOBitset nv;
-			if (!directed())
-				nv = pattern_graph_row(0, curr_vert);
-			else
-			{
-				nv = forward_pattern_graph_row(curr_vert);
-				nv |= reverse_pattern_graph_row(curr_vert);
-			}
-			for (auto x : nv)
-			{
-				for (auto y : nv)
-				{
-					if (x >= y) continue;
-					if (is_pattern_equivalent(x, y))
-						_imp->pattern_equivalence.merge(x, y);
-				}
-				if (is_pattern_equivalent(curr_vert, x))
-					_imp->pattern_equivalence.merge(curr_vert, x);
-				if (!visited[x])
-					queue.push(x);
-			}
+            // Construct neighbor set for the current vertex
+            SVOBitset nv;
+            if (!directed())
+                nv = pattern_graph_row(0, curr_vert);
+            else
+            {
+                nv = forward_pattern_graph_row(curr_vert);
+                nv |= reverse_pattern_graph_row(curr_vert);
+            }
+            
+            // Partition the neighbors into equivalence sets
+            for (auto x : nv)
+            {
+                for (auto y : nv)
+                {
+                    if (x >= y) continue;
+                    if (_is_pattern_equivalent(x, y))
+                        _imp->pattern_equivalence.merge(x, y);
+                }
+                if (_is_pattern_equivalent(curr_vert, x))
+                {
+                    _imp->pattern_equivalence.merge(curr_vert, x);
+                }
+                if (!visited[x])
+                    queue.push(x);
+            }
 
-		}
-	}
+        }
+    }
+}
+
+// Function which checks if the equivalence data structure has p and q
+// equivalent.
+auto HomomorphismModel::is_pattern_equivalent(int p, int q) const -> bool
+{
+    return _imp->pattern_equivalence.find(p) == _imp->pattern_equivalence.find(q);
+}
+
+// Function which checks if the equivalence data structure has p and q
+// equivalent.
+auto HomomorphismModel::is_target_equivalent(int p, int q) const -> bool
+{
+    return _imp->target_equivalence.find(p) == _imp->target_equivalence.find(q);
+}
+
+auto HomomorphismModel::pattern_equivalence_multiplier() const -> loooong
+{
+    return _imp->pattern_equivalence.get_multiplier();
 }

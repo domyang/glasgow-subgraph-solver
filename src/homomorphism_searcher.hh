@@ -99,7 +99,7 @@ class HomomorphismSearcher
 
         auto propagate_occur_less_thans(const std::optional<HomomorphismAssignment> &, const HomomorphismAssignments &, Domains & new_domains) -> bool;
 
-        auto find_branch_domain(const Domains & domains) -> const HomomorphismDomain *;
+        auto find_branch_domain(Domains & domains) -> HomomorphismDomain *;
 
         auto copy_nonfixed_domains_and_make_assignment(
                 const Domains & domains,
@@ -130,7 +130,7 @@ class HomomorphismSearcher
 
         auto restarting_search(
                 HomomorphismAssignments & assignments,
-                const Domains & domains,
+                Domains & domains,
                 unsigned long long & nodes,
                 unsigned long long & propagations,
                 loooong & solution_count,

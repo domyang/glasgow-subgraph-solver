@@ -3,13 +3,17 @@
 
 #include <vector>
 
+#include "loooong.hh"
+
 class DisjointSet
 {
 	private:
 		unsigned count;
 		std::vector<unsigned> parents;
 		// For performing union by size
-		std::vector<int> sizes;
+		std::vector<unsigned> sizes;
+        loooong multiplier;
+        bool has_multiplier = false;
 
 	public:
 		DisjointSet(): count(0), parents(), sizes() {}
@@ -70,6 +74,21 @@ class DisjointSet
                 parents[y_root] = x_root;
                 sizes[x_root] = sizes[x_root] + sizes[y_root];
             }
+        }
+        
+        loooong get_multiplier()
+        {
+            if (has_multiplier)
+                return multiplier;
+
+            loooong m = 1;
+            for (unsigned i = 0; i < count; i++)
+                if (find(i) == i)
+                    for (unsigned j = 1; j <= sizes[i]; j++)
+                        m *= j;
+            multiplier = m;
+            has_multiplier = true;
+            return m;
         }
 };
 
