@@ -26,7 +26,7 @@ class HomomorphismModel
 
         auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
 
-        auto _build_pattern_equivalence() -> void;
+        auto _build_structural_equivalence(bool is_pattern) -> void;
 
         auto _check_degree_compatibility(
                 int p,
@@ -41,7 +41,8 @@ class HomomorphismModel
 
         auto _check_label_compatibility(int p, int t) const -> bool;
 
-		auto _is_pattern_equivalent(int p, int q) const -> bool;
+		auto _is_pattern_structurally_equivalent(int p, int q) const -> bool;
+		auto _is_target_structurally_equivalent(int p, int q) const -> bool;
 
     public:
         using PatternAdjacencyBitsType = uint8_t;
@@ -91,6 +92,11 @@ class HomomorphismModel
 		auto is_target_equivalent(int p, int q) const -> bool;
 
 		auto pattern_equivalence_multiplier() const -> loooong;
+		auto target_equivalence_multiplier() const -> loooong;
+        auto target_class_size(int t) const -> int;
+
+		auto pattern_representative(int p) const -> int;
+		auto target_representative(int t) const -> int;
 
         auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
 };

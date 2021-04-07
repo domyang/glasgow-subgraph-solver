@@ -68,6 +68,12 @@ auto HomomorphismSearcher::save_result(const HomomorphismAssignments & assignmen
     result.extra_stats.push_back(where);
 }
 
+loooong binom(unsigned n, unsigned k)
+{
+    if (k == 0) return 1;
+    else return (n * binom(n-1, k-1)) / k;
+}
+
 auto HomomorphismSearcher::restarting_search(
         HomomorphismAssignments & assignments,
         Domains & domains,
@@ -106,8 +112,55 @@ auto HomomorphismSearcher::restarting_search(
         if (params.count_solutions) {
             // we could be finding duplicate solutions, in threaded search
             if (_duplicate_solution_filterer(assignments)) {
-				if (params.pattern_equivalence == PatternEquivalence::Structural)
+				if ((params.pattern_equivalence == PatternEquivalence::Structural)
+					&& (params.target_equivalence == TargetEquivalence::Structural))
+				{
+					loooong count = model.pattern_equivalence_multiplier();
+
+					std::vector<unsigned> p_reps;
+					std::vector<unsigned> t_reps;
+					std::vector<bool> seen_p_reps(model.pattern_size, false);
+					std::vector<bool> seen_t_reps(model.target_size, false);
+					std::map<std::pair<unsigned,unsigned>,unsigned> use_counts;
+					for (auto &a : assignments.values)
+					{
+						unsigned p_rep = model.pattern_representative(a.assignment.pattern_vertex);
+						unsigned t_rep = model.target_representative(a.assignment.target_vertex);
+						if (!seen_p_reps[p_rep])
+						{
+							p_reps.push_back(p_rep);
+							seen_p_reps[p_rep] = true;
+						}
+						if (!seen_t_reps[t_rep])
+						{
+							t_reps.push_back(t_rep);
+							seen_t_reps[t_rep] = true;
+						}
+
+						auto use_count = use_counts.find({p_rep, t_rep});
+						if (use_count != use_counts.end())
+							use_count->second++;
+						else
+							use_counts.insert({{p_rep, t_rep}, 1});
+					}
+
+					for (unsigned j = 0; j < t_reps.size(); j++)
+					{
+						unsigned total = 0;
+						for (unsigned i = 0; i < p_reps.size(); i++)
+						{
+							unsigned use_count = use_counts[{p_reps[i], t_reps[j]}];
+							count *= binom(model.target_class_size(t_reps[j]) - total,
+										   use_count);
+							total += use_count;
+						}
+					}
+					solution_count += count;
+				}
+				else if (params.pattern_equivalence == PatternEquivalence::Structural)
 					solution_count += model.pattern_equivalence_multiplier();
+				else if (params.target_equivalence == TargetEquivalence::Structural)
+					solution_count += model.target_equivalence_multiplier();
 				else
                 	++solution_count;
 
@@ -159,8 +212,20 @@ auto HomomorphismSearcher::restarting_search(
     // override whether we use the lackey for propagation, in case we are inside a backjump
     bool use_lackey_for_propagation = false;
 
+	vector<bool> seen_reps(model.target_size, false);
+
     // for each value remaining...
     for (auto f_v = branch_v.begin(), f_end = branch_v.begin() + branch_v_end ; f_v != f_end ; ++f_v) {
+
+		if (params.target_equivalence != TargetEquivalence::None)
+		{
+			int target_rep = model.target_representative(*f_v);
+			if (seen_reps[target_rep])
+				continue;
+			seen_reps[target_rep] = true;
+		}
+
+
         if (params.proof)
             params.proof->guessing(depth, model.pattern_vertex_for_proof(branch_domain->v), model.target_vertex_for_proof(*f_v));
 
@@ -692,7 +757,11 @@ auto HomomorphismSearcher::propagate(Domains & new_domains, HomomorphismAssignme
 
             // ok, make the assignment
             branch_domain->fixed = true;
-            assignments.values.push_back({ *current_assignment, false, -1, -1 });
+
+			// This is to prevent duplicate assignments appearing in the list
+			auto &last_assignment = assignments.values.back();
+			if (current_assignment->pattern_vertex != last_assignment.assignment.pattern_vertex)
+            	assignments.values.push_back({ *current_assignment, false, -1, -1 });
 
             if (params.proof)
                 params.proof->unit_propagating(

@@ -90,6 +90,11 @@ class DisjointSet
             has_multiplier = true;
             return m;
         }
+
+        unsigned get_size(int x)
+        {
+            return sizes.at(find(x));
+        }
 };
 
 #endif
