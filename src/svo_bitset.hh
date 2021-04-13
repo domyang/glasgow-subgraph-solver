@@ -249,8 +249,32 @@ class SVOBitset
             unsigned pos;
         };
 
+        struct ConstIterator
+        {
+            using iterator_category = std::forward_iterator_tag;
+            using difference_type = std::ptrdiff_t;
+            using value_type = unsigned;
+            using pointer = unsigned const*;
+            using reference = unsigned const&;
+
+            ConstIterator(const SVOBitset& set, unsigned p): bitset(set), pos(p) {}
+            reference operator*() { return pos; }
+            pointer operator->() { return &pos; }
+
+            ConstIterator& operator++() {pos = bitset.find_first_after(pos); return *this;}
+            ConstIterator& operator++(int) {pos = bitset.find_first_after(pos); return *this;}
+            friend bool operator==(const ConstIterator& a, const ConstIterator& b){return a.pos == b.pos;}
+            friend bool operator!=(const ConstIterator& a, const ConstIterator& b){return a.pos != b.pos;}
+
+        private:
+            const SVOBitset& bitset;
+            unsigned pos;
+        };
+
         Iterator begin() {int pos = find_first(); return Iterator(*this, pos);}
         Iterator end() {return Iterator(*this, npos);}
+        ConstIterator cbegin() const {int pos = find_first(); return ConstIterator(*this, pos);}
+        ConstIterator cend() const {return ConstIterator(*this, npos);}
 		
 };
 
