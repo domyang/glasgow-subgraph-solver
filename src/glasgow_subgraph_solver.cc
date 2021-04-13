@@ -289,6 +289,11 @@ auto main(int argc, char * argv[]) -> int
             }
         }
 
+        // A boolean indicating whether we will need to recompute equivalence
+        params.recompute_equivalence = (params.target_equivalence == TargetEquivalence::Candidate
+                                        || params.target_equivalence == TargetEquivalence::Full
+                                        || params.target_equivalence == TargetEquivalence::NodeCover);
+
         params.clique_detection = ! options_vars.count("no-clique-detection");
         params.distance3 = options_vars.count("distance3");
         params.k4 = options_vars.count("k4");

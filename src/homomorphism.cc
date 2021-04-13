@@ -59,10 +59,10 @@ namespace
     {
         using Domains = vector<HomomorphismDomain>;
 
-        const HomomorphismModel & model;
+        HomomorphismModel & model;
         const HomomorphismParams & params;
 
-        HomomorphismSolver(const HomomorphismModel & m, const HomomorphismParams & p) :
+        HomomorphismSolver(HomomorphismModel & m, const HomomorphismParams & p) :
             model(m),
             params(p)
         {
@@ -202,7 +202,7 @@ namespace
     {
         unsigned n_threads;
 
-        ThreadedSolver(const HomomorphismModel & m, const HomomorphismParams & p, unsigned t) :
+        ThreadedSolver(HomomorphismModel & m, const HomomorphismParams & p, unsigned t) :
             HomomorphismSolver(m, p),
             n_threads(t)
         {
