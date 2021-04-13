@@ -128,10 +128,11 @@ auto HomomorphismSearcher::compute_PE_TE_solution_count(const HomomorphismAssign
 
 auto HomomorphismSearcher::restore_assignments(HomomorphismAssignments &assignments, unsigned assignments_size, Domains &domains) -> void
 {
-    for (auto i = assignments_size; i < assignments.values.size(); i++)
+    for (int i=assignments.values.size()-1; i >= (int) assignments_size; i--)
     {
         assigned_pattern_vertices[assignments.values[i].assignment.pattern_vertex] = false;
-        if (params.recompute_equivalence)
+        std::cout << "Unmapping " << assignments.values[i].assignment.pattern_vertex << " from " << assignments.values[i].assignment.target_vertex << std::endl;
+        if (params.using_target_equivalence)
             model.down_target_num_used(assignments.values[i].assignment.target_vertex);
     }
 
@@ -146,7 +147,7 @@ auto HomomorphismSearcher::restore_assignments(HomomorphismAssignments &assignme
                 && (model.is_pattern_equivalent(d.v, pattern_vertex)))
                 d.values.reset(target_vertex);
     }
-    if (params.recompute_equivalence)
+    if (params.using_target_equivalence)
         solution_multiplier /= model.target_class_size(target_vertex) - model.get_target_num_used(target_vertex);
 
     assignments.values.resize(assignments_size);
@@ -190,17 +191,19 @@ auto HomomorphismSearcher::restarting_search(
         if (params.count_solutions) {
             // we could be finding duplicate solutions, in threaded search
             if (_duplicate_solution_filterer(assignments)) {
+                loooong count;
                 if ((params.pattern_equivalence == PatternEquivalence::Structural)
                     && (params.target_equivalence == TargetEquivalence::Structural))
-                    solution_count += compute_PE_TE_solution_count(assignments);
+                    count = compute_PE_TE_solution_count(assignments);
                 else if (params.pattern_equivalence == PatternEquivalence::Structural)
-                    solution_count += model.pattern_equivalence_multiplier();
-                else if (params.target_equivalence == TargetEquivalence::Structural)
-                    solution_count += model.target_equivalence_multiplier();
-                else if (params.recompute_equivalence)
-                    solution_count += solution_multiplier;
+                    count = model.pattern_equivalence_multiplier();
+                else if (params.using_target_equivalence)
+                    count = solution_multiplier;
                 else
-                    ++solution_count;
+                    count = 1;
+
+                std::cout << count << " solutions found." << std::endl;
+                solution_count += count;
 
                 if (params.enumerate_callback) {
                     VertexToVertexMapping mapping;
@@ -285,11 +288,13 @@ auto HomomorphismSearcher::restarting_search(
         // modified in-place by appending, we can restore by shrinking
         auto assignments_size = assignments.values.size();
 
+        std::cout << "Mapping " << branch_domain->v << " to " << *f_v << std::endl;
+
         // make the assignment
         assignments.values.push_back({ { branch_domain->v, unsigned(*f_v) }, true, discrepancy_count, int(branch_v_end) });
         assigned_pattern_vertices[branch_domain->v] = true;
 
-        if (params.recompute_equivalence)
+        if (params.using_target_equivalence)
         {
             solution_multiplier *= model.target_class_size(*f_v) - model.get_target_num_used(*f_v);
             model.up_target_num_used(*f_v);
@@ -363,16 +368,18 @@ auto HomomorphismSearcher::restarting_search(
                 restore_assignments(assignments, assignments_size, domains);
                 break;
         }
-
-        if ((params.target_equivalence == TargetEquivalence::NodeCover) 
-            && outside_cover && depth == recompute_depth)
-        {
-            model.restore_equivalence(equivalence_copy);
-            outside_cover = false;
-        }
-
         ++discrepancy_count;
     }
+
+	if (params.target_equivalence == TargetEquivalence::Candidate
+		|| params.target_equivalence == TargetEquivalence::Full)
+		model.restore_equivalence(equivalence_copy);
+	else if (params.target_equivalence == TargetEquivalence::NodeCover
+		&& outside_cover && depth == recompute_depth)
+	{
+		model.restore_equivalence(equivalence_copy);
+		outside_cover = false;
+	}
 
     // no values remaining, backtrack, or possibly kick off a restart
     if (params.proof)
@@ -604,28 +611,33 @@ auto HomomorphismSearcher::propagate_simple_constraints(Domains & new_domains, c
                 break;
         }
 
-        // adjacency
-        if (! model.has_edge_labels()) {
-            if (params.induced) {
-                if (model.directed())
-                    propagate_adjacency_constraints<true, false, true>(d, current_assignment);
-                else
-                    propagate_adjacency_constraints<false, false, true>(d, current_assignment);
-            }
-            else {
-                if (model.directed())
-                    propagate_adjacency_constraints<true, false, false>(d, current_assignment);
-                else
-                    propagate_adjacency_constraints<false, false, false>(d, current_assignment);
-            }
-        }
-        else {
-            // edge labels are always directed
-            if (params.induced)
-                propagate_adjacency_constraints<true, true, true>(d, current_assignment);
-            else
-                propagate_adjacency_constraints<true, true, false>(d, current_assignment);
-        }
+		// If we are using node cover equivalence, we don't need to bother with
+		// adjacency constraints once we are outside the node cover.
+		if (params.target_equivalence != TargetEquivalence::NodeCover || !outside_cover)
+		{
+			// adjacency
+			if (! model.has_edge_labels()) {
+				if (params.induced) {
+					if (model.directed())
+						propagate_adjacency_constraints<true, false, true>(d, current_assignment);
+					else
+						propagate_adjacency_constraints<false, false, true>(d, current_assignment);
+				}
+				else {
+					if (model.directed())
+						propagate_adjacency_constraints<true, false, false>(d, current_assignment);
+					else
+						propagate_adjacency_constraints<false, false, false>(d, current_assignment);
+				}
+			}
+			else {
+				// edge labels are always directed
+				if (params.induced)
+					propagate_adjacency_constraints<true, true, true>(d, current_assignment);
+				else
+					propagate_adjacency_constraints<true, true, false>(d, current_assignment);
+			}
+		}
 
         // we might have removed values
         d.count = d.values.count();
@@ -782,8 +794,7 @@ auto HomomorphismSearcher::propagate_occur_less_thans(
             }
 
             for (auto & d : assignments.values)
-                if (d.assignment.pattern_vertex < current_assignment->pattern_vertex && a == d.assignment.target_vertex)
-                    saw_an_a = true;
+                if (d.assignment.pattern_vertex < current_assignment->pattern_vertex && a == d.assignment.target_vertex) saw_an_a = true;
 
             if (! saw_an_a)
                 return false;
@@ -818,9 +829,10 @@ auto HomomorphismSearcher::propagate(Domains & new_domains, HomomorphismAssignme
             // This is to prevent duplicate assignments appearing in the list
             if (!assigned_pattern_vertices[current_assignment->pattern_vertex])
             {
+                std::cout << "Mapping " << current_assignment->pattern_vertex << " to " << current_assignment->target_vertex << std::endl;
                 assignments.values.push_back({ *current_assignment, false, -1, -1 });
                 assigned_pattern_vertices[current_assignment->pattern_vertex] = true;
-                if (params.recompute_equivalence)
+                if (params.using_target_equivalence)
                     model.up_target_num_used(current_assignment->target_vertex);
             }
 
@@ -920,8 +932,8 @@ auto HomomorphismSearcher::assigned_cover() const -> bool
             nv = model.pattern_graph_row(0, i);
         else
         {
-            nv = model.forward_pattern_graph_row(0);
-            nv |= model.reverse_pattern_graph_row(0);
+            nv = model.forward_pattern_graph_row(i);
+            nv |= model.reverse_pattern_graph_row(i);
         }
 
         for (auto x : nv)

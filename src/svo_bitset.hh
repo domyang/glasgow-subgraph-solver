@@ -205,6 +205,27 @@ class SVOBitset
             return *this;
         }
 
+        auto operator== (const SVOBitset & other) -> bool
+        {
+            if (! _is_long()) {
+                for (unsigned i = 0 ; i < svo_size ; ++i)
+                    if (_data.short_data[i] != other._data.short_data[i])
+						return false;
+            }
+            else {
+                for (unsigned i = 0 ; i < n_words ; ++i)
+                    if (_data.long_data[i] != other._data.long_data[i])
+						return false;
+            }
+
+            return true;
+        }
+
+		auto operator!= (const SVOBitset & other) -> bool
+		{
+			return !(*this == other);
+		}
+
         auto intersect_with_complement(const SVOBitset & other) -> void
         {
             if (! _is_long()) {

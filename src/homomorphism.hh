@@ -114,7 +114,8 @@ struct HomomorphismParams
     // Level of target equivalence
     TargetEquivalence target_equivalence = TargetEquivalence::None;
 
-    bool recompute_equivalence = false;
+	// bool indicating if we are using target equivalence
+    bool using_target_equivalence = false;
 };
 
 struct HomomorphismResult

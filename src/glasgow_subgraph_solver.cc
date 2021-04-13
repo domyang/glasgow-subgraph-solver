@@ -289,8 +289,9 @@ auto main(int argc, char * argv[]) -> int
             }
         }
 
-        // A boolean indicating whether we will need to recompute equivalence
-        params.recompute_equivalence = (params.target_equivalence == TargetEquivalence::Candidate
+        // A boolean indicating whether we are using target equivalence
+        params.using_target_equivalence = (params.target_equivalence == TargetEquivalence::Structural
+										|| params.target_equivalence == TargetEquivalence::Candidate
                                         || params.target_equivalence == TargetEquivalence::Full
                                         || params.target_equivalence == TargetEquivalence::NodeCover);
 
@@ -406,6 +407,16 @@ auto main(int argc, char * argv[]) -> int
             cout << "proof_model = " << fn << ".opb" << suffix << endl;
             cout << "proof_log = " << fn << ".log" << suffix << endl;
         }
+		
+		cout << "pattern_mapping = ";
+		for (int i = 0; i < pattern.size(); i++)
+			cout << i << " " << pattern.vertex_name(i) << " ";
+		cout << endl;
+
+		cout << "target_mapping = ";
+		for (int i = 0; i < target.size(); i++)
+			cout << i << " " << target.vertex_name(i) << " ";
+		cout << endl;
 
         cout << "pattern_vertices = " << pattern.size() << endl;
         cout << "pattern_directed_edges = " << pattern.number_of_directed_edges() << endl;
