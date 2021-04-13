@@ -680,7 +680,7 @@ auto HomomorphismModel::prepare() -> bool
 
     if (_imp->params.pattern_equivalence == PatternEquivalence::Structural)
         _build_structural_equivalence(true);
-    if (_imp->params.target_equivalence == TargetEquivalence::Structural)
+    if (_imp->params.target_equivalence != TargetEquivalence::None)
         _build_structural_equivalence(false);
 
     return true;
@@ -1136,6 +1136,11 @@ auto HomomorphismModel::is_target_equivalent(int p, int q) const -> bool
     return _imp->target_equivalence.find(p) == _imp->target_equivalence.find(q);
 }
 
+auto HomomorphismModel::get_target_equivalence() const -> const DisjointSet&
+{
+	return _imp->target_equivalence;
+}
+
 auto HomomorphismModel::pattern_representative(int p) const -> int
 {
     return _imp->pattern_equivalence.find(p);
@@ -1159,4 +1164,29 @@ auto HomomorphismModel::pattern_equivalence_multiplier() const -> loooong
 auto HomomorphismModel::target_equivalence_multiplier() const -> loooong
 {
     return _imp->target_equivalence.get_multiplier();
+}
+
+auto HomomorphismModel::merge_target_classes(int x, int y) -> void
+{
+	_imp->target_equivalence.merge(x, y);
+}
+
+auto HomomorphismModel::restore_equivalence(const DisjointSet &target_equivalence) -> void
+{
+	_imp->target_equivalence = target_equivalence;
+}
+
+auto HomomorphismModel::get_target_num_used(int x) -> unsigned
+{
+	return _imp->target_equivalence.get_num_used(x);
+}
+
+auto HomomorphismModel::up_target_num_used(int x) -> void
+{
+	_imp->target_equivalence.up_num_used(x);
+}
+
+auto HomomorphismModel::down_target_num_used(int x) -> void
+{
+	_imp->target_equivalence.down_num_used(x);
 }

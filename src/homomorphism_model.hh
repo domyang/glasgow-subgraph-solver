@@ -91,14 +91,22 @@ class HomomorphismModel
 		auto is_pattern_equivalent(int p, int q) const -> bool;
 		auto is_target_equivalent(int p, int q) const -> bool;
 
+        auto get_target_equivalence() const -> const DisjointSet&;
+
 		auto pattern_equivalence_multiplier() const -> loooong;
 		auto target_equivalence_multiplier() const -> loooong;
         auto target_class_size(int t) const -> int;
+        auto merge_target_classes(int x, int y) -> void;
 
 		auto pattern_representative(int p) const -> int;
 		auto target_representative(int t) const -> int;
 
         auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
+        auto restore_equivalence(const DisjointSet &target_equivalence) -> void;
+
+        auto get_target_num_used(int x) -> unsigned;
+        auto up_target_num_used(int x) -> void;
+        auto down_target_num_used(int x) -> void;
 };
 
 #endif
