@@ -485,6 +485,7 @@ auto main(int argc, char * argv[]) -> int
 
         cout << "nodes = " << result.nodes << endl;
         cout << "propagations = " << result.propagations << endl;
+		cout << "representative_solution_count = " << result.representative_solution_count << endl;
 
         if (! result.mapping.empty() && ! options_vars.count("print-all-solutions")) {
             cout << "mapping = ";

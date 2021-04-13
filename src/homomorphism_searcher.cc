@@ -160,6 +160,7 @@ auto HomomorphismSearcher::restarting_search(
         unsigned long long & nodes,
         unsigned long long & propagations,
         loooong & solution_count,
+		loooong & representative_solution_count,
         int depth,
         RestartsSchedule & restarts_schedule) -> SearchResult
 {
@@ -206,6 +207,7 @@ auto HomomorphismSearcher::restarting_search(
 				if (params.verbose)
                 	std::cout << count << " solutions found." << std::endl;
                 solution_count += count;
+				representative_solution_count++;
 
                 if (params.enumerate_callback) {
                     VertexToVertexMapping mapping;
@@ -323,7 +325,7 @@ auto HomomorphismSearcher::restarting_search(
 
         // recursive search
         auto search_result = restarting_search(assignments, new_domains, nodes, propagations,
-                solution_count, depth + 1, restarts_schedule);
+                solution_count, representative_solution_count, depth + 1, restarts_schedule);
 
         switch (search_result) {
             case SearchResult::Satisfiable:

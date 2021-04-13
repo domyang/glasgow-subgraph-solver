@@ -138,6 +138,9 @@ struct HomomorphismResult
     /// Number of solutions, only if enumerating
     loooong solution_count = 0;
 
+	/// Number of representative solutions
+	loooong representative_solution_count = 0;
+
     /// Did we perform a complete search?
     bool complete = false;
 };
