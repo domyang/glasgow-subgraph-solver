@@ -985,9 +985,7 @@ auto HomomorphismModel::_is_target_structurally_equivalent(int x, int y) const -
         // they are not equivalent.
         nx.reset(y);
         ny.reset(x);
-        unsigned neighbor_count = nx.count();
-        nx &= ny;
-        if (neighbor_count != nx.count())
+        if (nx != ny)
             return false;
 
         // Otherwise, they have the same neighbors, we check the edge labels now
@@ -1020,14 +1018,10 @@ auto HomomorphismModel::_is_target_structurally_equivalent(int x, int y) const -
         n_in_y.reset(x);
 
         // Check if have the same set of in neighbors and out neighbors
-        unsigned out_neighbor_count = n_out_x.count();
-        n_out_x &= n_out_y;
-        if (out_neighbor_count != n_out_x.count())
+        if (n_out_x != n_out_y)
             return false;
 
-        unsigned in_neighbor_count = n_in_x.count();
-        n_in_x &= n_out_y;
-        if (in_neighbor_count != n_in_x.count())
+        if (n_in_x != n_out_y)
             return false;
 
         // Otherwise, they have the same neighbors, we check the edge labels now
