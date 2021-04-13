@@ -1,10 +1,14 @@
 /* vim: set sw=4 sts=4 et foldmethod=syntax : */
 
 #include "homomorphism_searcher.hh"
+#include "loooong.hh"
 #include "cheap_all_different.hh"
+#include "equivalence.hh"
 #include "graph_equivalence.hh"
 
 #include <optional>
+#include <vector>
+#include <unordered_map>
 
 using std::make_optional;
 using std::max;
@@ -19,11 +23,12 @@ using std::to_string;
 using std::uniform_int_distribution;
 using std::vector;
 
-HomomorphismSearcher::HomomorphismSearcher(const HomomorphismModel & m, const HomomorphismParams & p,
+HomomorphismSearcher::HomomorphismSearcher(HomomorphismModel & m, const HomomorphismParams & p,
         const DuplicateSolutionFilterer & d) :
     model(m),
     params(p),
-    _duplicate_solution_filterer(d)
+    _duplicate_solution_filterer(d),
+    assigned_pattern_vertices(m.pattern_size, false)
 {
     if (might_have_watches(params)) {
         watches.table.target_size = model.target_size;
@@ -68,10 +73,83 @@ auto HomomorphismSearcher::save_result(const HomomorphismAssignments & assignmen
     result.extra_stats.push_back(where);
 }
 
-loooong binom(unsigned n, unsigned k)
+auto binom(unsigned n, unsigned k) -> loooong
 {
     if (k == 0) return 1;
     else return (n * binom(n-1, k-1)) / k;
+}
+
+
+// Compute solution count when using both pattern and target structural equivalence
+auto HomomorphismSearcher::compute_PE_TE_solution_count(const HomomorphismAssignments &assignments) const -> loooong
+{
+    loooong count = model.pattern_equivalence_multiplier();
+
+    std::vector<unsigned> p_reps;
+    std::vector<unsigned> t_reps;
+    std::vector<bool> seen_p_reps(model.pattern_size, false);
+    std::vector<bool> seen_t_reps(model.target_size, false);
+    std::map<std::pair<unsigned,unsigned>,unsigned> use_counts;
+    for (auto &a : assignments.values)
+    {
+        unsigned p_rep = model.pattern_representative(a.assignment.pattern_vertex);
+        unsigned t_rep = model.target_representative(a.assignment.target_vertex);
+        if (!seen_p_reps[p_rep])
+        {
+            p_reps.push_back(p_rep);
+            seen_p_reps[p_rep] = true;
+        }
+        if (!seen_t_reps[t_rep])
+        {
+            t_reps.push_back(t_rep);
+            seen_t_reps[t_rep] = true;
+        }
+
+        auto use_count = use_counts.find({p_rep, t_rep});
+        if (use_count != use_counts.end())
+            use_count->second++;
+        else
+            use_counts.insert({{p_rep, t_rep}, 1});
+    }
+
+    for (unsigned j = 0; j < t_reps.size(); j++)
+    {
+        unsigned total = 0;
+        for (unsigned i = 0; i < p_reps.size(); i++)
+        {
+            unsigned use_count = use_counts[{p_reps[i], t_reps[j]}];
+            count *= binom(model.target_class_size(t_reps[j]) - total,
+                           use_count);
+            total += use_count;
+        }
+    }
+    return count;
+}
+
+auto HomomorphismSearcher::restore_assignments(HomomorphismAssignments &assignments, unsigned assignments_size, Domains &domains) -> void
+{
+    for (auto i = assignments_size; i < assignments.values.size(); i++)
+    {
+        assigned_pattern_vertices[assignments.values[i].assignment.pattern_vertex] = false;
+        if (params.recompute_equivalence)
+            model.down_target_num_used(assignments.values[i].assignment.target_vertex);
+    }
+
+    unsigned pattern_vertex = assignments.values[assignments_size].assignment.pattern_vertex;
+    unsigned target_vertex = assignments.values[assignments_size].assignment.target_vertex;
+
+    if (params.pattern_equivalence == PatternEquivalence::Structural)
+    {
+        // Eliminate f_v from domain of all pattern equivalent vertices.
+        for (auto &d : domains)
+            if ((d.v != pattern_vertex) 
+                && (model.is_pattern_equivalent(d.v, pattern_vertex)))
+                d.values.reset(target_vertex);
+    }
+    if (params.recompute_equivalence)
+        solution_multiplier /= model.target_class_size(target_vertex) - model.get_target_num_used(target_vertex);
+
+    assignments.values.resize(assignments_size);
 }
 
 auto HomomorphismSearcher::restarting_search(
@@ -112,57 +190,17 @@ auto HomomorphismSearcher::restarting_search(
         if (params.count_solutions) {
             // we could be finding duplicate solutions, in threaded search
             if (_duplicate_solution_filterer(assignments)) {
-				if ((params.pattern_equivalence == PatternEquivalence::Structural)
-					&& (params.target_equivalence == TargetEquivalence::Structural))
-				{
-					loooong count = model.pattern_equivalence_multiplier();
-
-					std::vector<unsigned> p_reps;
-					std::vector<unsigned> t_reps;
-					std::vector<bool> seen_p_reps(model.pattern_size, false);
-					std::vector<bool> seen_t_reps(model.target_size, false);
-					std::map<std::pair<unsigned,unsigned>,unsigned> use_counts;
-					for (auto &a : assignments.values)
-					{
-						unsigned p_rep = model.pattern_representative(a.assignment.pattern_vertex);
-						unsigned t_rep = model.target_representative(a.assignment.target_vertex);
-						if (!seen_p_reps[p_rep])
-						{
-							p_reps.push_back(p_rep);
-							seen_p_reps[p_rep] = true;
-						}
-						if (!seen_t_reps[t_rep])
-						{
-							t_reps.push_back(t_rep);
-							seen_t_reps[t_rep] = true;
-						}
-
-						auto use_count = use_counts.find({p_rep, t_rep});
-						if (use_count != use_counts.end())
-							use_count->second++;
-						else
-							use_counts.insert({{p_rep, t_rep}, 1});
-					}
-
-					for (unsigned j = 0; j < t_reps.size(); j++)
-					{
-						unsigned total = 0;
-						for (unsigned i = 0; i < p_reps.size(); i++)
-						{
-							unsigned use_count = use_counts[{p_reps[i], t_reps[j]}];
-							count *= binom(model.target_class_size(t_reps[j]) - total,
-										   use_count);
-							total += use_count;
-						}
-					}
-					solution_count += count;
-				}
-				else if (params.pattern_equivalence == PatternEquivalence::Structural)
-					solution_count += model.pattern_equivalence_multiplier();
-				else if (params.target_equivalence == TargetEquivalence::Structural)
-					solution_count += model.target_equivalence_multiplier();
-				else
-                	++solution_count;
+                if ((params.pattern_equivalence == PatternEquivalence::Structural)
+                    && (params.target_equivalence == TargetEquivalence::Structural))
+                    solution_count += compute_PE_TE_solution_count(assignments);
+                else if (params.pattern_equivalence == PatternEquivalence::Structural)
+                    solution_count += model.pattern_equivalence_multiplier();
+                else if (params.target_equivalence == TargetEquivalence::Structural)
+                    solution_count += model.target_equivalence_multiplier();
+                else if (params.recompute_equivalence)
+                    solution_count += solution_multiplier;
+                else
+                    ++solution_count;
 
                 if (params.enumerate_callback) {
                     VertexToVertexMapping mapping;
@@ -212,18 +250,33 @@ auto HomomorphismSearcher::restarting_search(
     // override whether we use the lackey for propagation, in case we are inside a backjump
     bool use_lackey_for_propagation = false;
 
-	vector<bool> seen_reps(model.target_size, false);
+    DisjointSet equivalence_copy = model.get_target_equivalence();
+
+    if ((params.target_equivalence == TargetEquivalence::Candidate)
+        || (params.target_equivalence == TargetEquivalence::Full))
+        recompute_equivalence(domains, branch_v, branch_v_end, branch_domain->v);
+    else if (params.target_equivalence == TargetEquivalence::NodeCover)
+    {
+        if (!outside_cover && assigned_cover())
+        {
+            compute_node_cover_equivalence(domains);
+            recompute_depth = depth;
+            outside_cover = true;
+        }
+    }
+
+    vector<bool> seen_reps(model.target_size, false);
 
     // for each value remaining...
     for (auto f_v = branch_v.begin(), f_end = branch_v.begin() + branch_v_end ; f_v != f_end ; ++f_v) {
 
-		if (params.target_equivalence != TargetEquivalence::None)
-		{
-			int target_rep = model.target_representative(*f_v);
-			if (seen_reps[target_rep])
-				continue;
-			seen_reps[target_rep] = true;
-		}
+        if (params.target_equivalence != TargetEquivalence::None)
+        {
+            int target_rep = model.target_representative(*f_v);
+            if (seen_reps[target_rep])
+                continue;
+            seen_reps[target_rep] = true;
+        }
 
 
         if (params.proof)
@@ -234,6 +287,13 @@ auto HomomorphismSearcher::restarting_search(
 
         // make the assignment
         assignments.values.push_back({ { branch_domain->v, unsigned(*f_v) }, true, discrepancy_count, int(branch_v_end) });
+        assigned_pattern_vertices[branch_domain->v] = true;
+
+        if (params.recompute_equivalence)
+        {
+            solution_multiplier *= model.target_class_size(*f_v) - model.get_target_num_used(*f_v);
+            model.up_target_num_used(*f_v);
+        }
 
         // set up new domains
         Domains new_domains = copy_nonfixed_domains_and_make_assignment(domains, branch_domain->v, *f_v);
@@ -245,9 +305,8 @@ auto HomomorphismSearcher::restarting_search(
             if (params.proof)
                 params.proof->propagation_failure(assignments_as_proof_decisions(assignments), model.pattern_vertex_for_proof(branch_domain->v), model.target_vertex_for_proof(*f_v));
 
-            assignments.values.resize(assignments_size);
+            restore_assignments(assignments, assignments_size, domains);
             actually_hit_a_failure = true;
-
             continue;
         }
 
@@ -267,7 +326,7 @@ auto HomomorphismSearcher::restarting_search(
 
             case SearchResult::Restart:
                 // restore assignments before posting nogoods, it's easier
-                assignments.values.resize(assignments_size);
+                restore_assignments(assignments, assignments_size, domains);
 
                 // post nogoods for everything we've done so far
                 for (auto l = branch_v.begin() ; l != f_v ; ++l) {
@@ -286,8 +345,7 @@ auto HomomorphismSearcher::restarting_search(
                 }
 
                 // restore assignments
-                assignments.values.resize(assignments_size);
-
+                restore_assignments(assignments, assignments_size, domains);
                 break;
 
             case SearchResult::UnsatisfiableAndBackjumpUsingLackey:
@@ -302,17 +360,16 @@ auto HomomorphismSearcher::restarting_search(
                 }
 
                 // restore assignments
-                assignments.values.resize(assignments_size);
-                actually_hit_a_failure = true;
+                restore_assignments(assignments, assignments_size, domains);
                 break;
         }
-		if (params.pattern_equivalence == PatternEquivalence::Structural)
-			// Eliminate f_v from domain of all pattern equivalent vertices.
-			for (auto &d : domains)
-				if ((d.v != branch_domain->v) 
-					&& (model.is_pattern_equivalent(d.v, branch_domain->v)))
-					d.values.reset(*f_v);
 
+        if ((params.target_equivalence == TargetEquivalence::NodeCover) 
+            && outside_cover && depth == recompute_depth)
+        {
+            model.restore_equivalence(equivalence_copy);
+            outside_cover = false;
+        }
 
         ++discrepancy_count;
     }
@@ -758,10 +815,15 @@ auto HomomorphismSearcher::propagate(Domains & new_domains, HomomorphismAssignme
             // ok, make the assignment
             branch_domain->fixed = true;
 
-			// This is to prevent duplicate assignments appearing in the list
-			auto &last_assignment = assignments.values.back();
-			if (current_assignment->pattern_vertex != last_assignment.assignment.pattern_vertex)
-            	assignments.values.push_back({ *current_assignment, false, -1, -1 });
+            // This is to prevent duplicate assignments appearing in the list
+            if (!assigned_pattern_vertices[current_assignment->pattern_vertex])
+            {
+                assignments.values.push_back({ *current_assignment, false, -1, -1 });
+                assigned_pattern_vertices[current_assignment->pattern_vertex] = true;
+                if (params.recompute_equivalence)
+                    model.up_target_num_used(current_assignment->target_vertex);
+            }
+
 
             if (params.proof)
                 params.proof->unit_propagating(
@@ -845,3 +907,209 @@ auto HomomorphismSearcher::set_seed(int t) -> void
     global_rand.seed(t);
 }
 
+// Check if pattern node cover has been assigned
+auto HomomorphismSearcher::assigned_cover() const -> bool
+{
+    for (unsigned i = 0; i < model.pattern_size; i++)
+    {
+        if (assigned_pattern_vertices[i])
+            continue;
+
+        SVOBitset nv;
+        if (!model.directed())
+            nv = model.pattern_graph_row(0, i);
+        else
+        {
+            nv = model.forward_pattern_graph_row(0);
+            nv |= model.reverse_pattern_graph_row(0);
+        }
+
+        for (auto x : nv)
+        {
+            if (!assigned_pattern_vertices[x])
+                return false;
+        }
+    }
+    return true;
+}
+
+template <typename T>
+struct container_hash {
+    std::size_t operator()(T const &c) const {
+        return boost::hash_range(c.begin(), c.end());
+    }
+};
+
+auto HomomorphismSearcher::compute_node_cover_equivalence(Domains &domains) -> void
+{
+    std::map<unsigned, std::vector<unsigned>> inv_mapping;
+    std::unordered_map<std::vector<unsigned>, unsigned, container_hash<std::vector<unsigned>>> classes;
+
+    for (auto &d : domains)
+    {
+        for (auto x : d.values)
+        {
+            auto it = inv_mapping.find(x);
+            if (it == inv_mapping.end())
+                inv_mapping.insert({x, {d.v}});
+            else
+                it->second.push_back(d.v);
+        }
+    }
+
+    for (auto &pair : inv_mapping)
+    {
+        int target_vert = pair.first;
+        std::vector<unsigned> &pattern_cands = pair.second;
+        auto it = classes.find(pattern_cands);
+        if (it == classes.end())
+            classes.insert({pattern_cands, target_vert});
+        else
+            model.merge_target_classes(target_vert, it->second);
+    }
+}
+
+auto HomomorphismSearcher::is_candidate_equivalent(const Domains &domains, unsigned t1, unsigned t2, unsigned p, const vector<unsigned> &domain_mapping) -> bool
+{
+    if (!model.directed())
+    {
+        auto &nv = model.pattern_graph_row(0, p);
+        auto &nt1 = model.target_graph_row(0, t1);
+        auto &nt2 = model.target_graph_row(0, t2);
+        for (auto it = nv.cbegin(); it != nv.cend(); it++)
+        {
+            unsigned p_nbr = *it;
+            // We only need to check unassigned neighbors
+            // By adjacency propagation, for assigned neighbors, candidates of
+            // p should already have required connections to p_nbr
+            if (assigned_pattern_vertices[p_nbr])
+                continue;
+
+            const HomomorphismDomain &p_nbr_domain = domains[domain_mapping[p_nbr]];
+            for (auto it2 = p_nbr_domain.values.cbegin(); it2 != p_nbr_domain.values.cend(); it2++)
+            {
+                unsigned p_nbr_cand = *it2;
+                if (nt1.test(p_nbr_cand) != nt2.test(p_nbr_cand))
+                    return false;
+            }
+        }
+        return true;
+    }
+    else
+    {
+        auto &nv_f = model.forward_pattern_graph_row(p);
+        auto &nv_r = model.reverse_pattern_graph_row(p);
+        auto &nt1_f = model.forward_target_graph_row(t1);
+        auto &nt2_f = model.forward_target_graph_row(t2);
+        auto &nt1_r = model.reverse_target_graph_row(t1);
+        auto &nt2_r = model.reverse_target_graph_row(t2);
+
+        // Forward Edges
+        for (auto it = nv_f.cbegin(); it != nv_f.cend(); it++)
+        {
+            unsigned p_nbr = *it;
+            // We only need to check unassigned neighbors
+            // By adjacency propagation, for assigned neighbors, candidates of
+            // p should already have required connections to p_nbr
+            if (assigned_pattern_vertices[p_nbr])
+                continue;
+
+            const HomomorphismDomain &p_nbr_domain = domains[domain_mapping[p_nbr]];
+            for (auto it2 = p_nbr_domain.values.cbegin(); it2 != p_nbr_domain.values.cend(); it2++)
+            {
+                unsigned p_nbr_cand = *it2;
+                if (nt1_f.test(p_nbr_cand) != nt2_f.test(p_nbr_cand))
+                    return false;
+            }
+        }
+
+        // Reverse Edges
+        for (auto it = nv_r.cbegin(); it != nv_r.cend(); it++)
+        {
+            unsigned p_nbr = *it;
+            // We only need to check unassigned neighbors
+            // By adjacency propagation, for assigned neighbors, candidates of
+            // p should already have required connections to p_nbr
+            if (assigned_pattern_vertices[p_nbr])
+                continue;
+
+            const HomomorphismDomain &p_nbr_domain = domains[domain_mapping[p_nbr]];
+            for (auto it2 = p_nbr_domain.values.cbegin(); it2 != p_nbr_domain.values.cend(); it2++)
+            {
+                unsigned p_nbr_cand = *it2;
+                if (nt1_r.test(p_nbr_cand) != nt2_r.test(p_nbr_cand))
+                    return false;
+            }
+        }
+        return true;
+
+    }
+}
+
+auto HomomorphismSearcher::is_full_equivalent(const Domains &domains, unsigned t1, unsigned t2, const vector<unsigned> &domain_mapping) -> bool
+{
+    for (auto &d: domains)
+    {
+        if (d.values.test(t1) != d.values.test(t2))
+            return false;
+
+        // If neither are candidates, they are equivalent wrt this vertex
+        if (!d.values.test(t1) && !d.values.test(t2))
+            continue;
+
+        if (!is_candidate_equivalent(domains, t1, t2, d.v, domain_mapping))
+            return false;
+    }
+    return true;
+}
+
+auto HomomorphismSearcher::recompute_equivalence(const Domains &domains, const vector<int> &branch_v, unsigned branch_v_end, unsigned p) -> void
+{
+
+    vector<unsigned> domain_mapping(model.pattern_size);
+    for (unsigned i = 0; i < domains.size(); i++)
+        domain_mapping[domains[i].v] = i;
+
+    for (auto it = branch_v.begin(); it < branch_v.begin() + branch_v_end; it++)
+    {
+        for (auto it2 = it + 1; it2 < branch_v.begin() + branch_v_end; it2++)
+        {
+            if (model.is_target_equivalent(*it, *it2))
+                continue;
+
+
+            if (params.target_equivalence == TargetEquivalence::Candidate)
+            {
+                bool is_equivalent = true;
+                for (auto &d : domains)
+                {
+                    if (d.v == p)
+                    {
+                        // If it is not candidate equivalent with respect to p, break
+                        if (!is_candidate_equivalent(domains, *it, *it2, p, domain_mapping))
+                        {
+                            is_equivalent = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // If it is a candidate for other vertices, break
+                        if (d.values.test(*it) || d.values.test(*it2))
+                        {
+                            is_equivalent = false;
+                            break;
+                        }
+                    }
+                }
+                if (is_equivalent)
+                    model.merge_target_classes(*it, *it2);
+            }
+            else if (params.target_equivalence == TargetEquivalence::Full)
+            {
+                if (is_full_equivalent(domains, *it, *it2, domain_mapping))
+                    model.merge_target_classes(*it, *it2);
+            }
+        }
+    }
+}

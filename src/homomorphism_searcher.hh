@@ -7,6 +7,7 @@
 #include "homomorphism_domain.hh"
 #include "homomorphism_model.hh"
 #include "homomorphism_traits.hh"
+#include "loooong.hh"
 #include "watches.hh"
 
 #include <functional>
@@ -78,9 +79,15 @@ class HomomorphismSearcher
     private:
         using Domains = std::vector<HomomorphismDomain>;
 
-        const HomomorphismModel & model;
+        HomomorphismModel & model;
         const HomomorphismParams & params;
         const DuplicateSolutionFilterer _duplicate_solution_filterer;
+
+        std::vector<bool> assigned_pattern_vertices;
+        bool outside_cover = false;
+        int recompute_depth;
+
+        loooong solution_multiplier = 1;
 
         std::mt19937 global_rand;
 
@@ -120,8 +127,22 @@ class HomomorphismSearcher
                 bool reverse
                 ) -> void;
 
+        auto assigned_cover() const -> bool;
+        
+        auto compute_PE_TE_solution_count(const HomomorphismAssignments &assignments) const -> loooong;
+        
+        auto compute_node_cover_equivalence(Domains &domains) -> void;
+
+        // Restore the assigments to the point where there are assignments_size assignments
+        auto restore_assignments(HomomorphismAssignments &assignments, unsigned assignments_size, Domains &domains) -> void;
+
+        auto is_candidate_equivalent(const Domains &domains, unsigned t1, unsigned t2, unsigned p, const std::vector<unsigned> &domain_mapping) -> bool;
+
+        auto is_full_equivalent(const Domains &domains, unsigned t1, unsigned t2, const std::vector<unsigned> &domain_mapping) -> bool;
+
+        auto recompute_equivalence(const Domains &domains, const std::vector<int> &branch_v, unsigned branch_v_end, unsigned p) -> void;
     public:
-        HomomorphismSearcher(const HomomorphismModel & m, const HomomorphismParams & p,
+        HomomorphismSearcher(HomomorphismModel & m, const HomomorphismParams & p,
                 const DuplicateSolutionFilterer &);
 
         auto expand_to_full_result(const HomomorphismAssignments & assignments, VertexToVertexMapping & mapping) -> void;
