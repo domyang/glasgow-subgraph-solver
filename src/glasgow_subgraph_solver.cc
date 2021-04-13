@@ -54,7 +54,8 @@ auto main(int argc, char * argv[]) -> int
         display_options.add_options()
             ("help",                                         "Display help information")
             ("timeout",            po::value<int>(),         "Abort after this many seconds")
-            ("parallel",                                     "Use auto-configured parallel search (highly nondeterministic runtimes)");
+            ("parallel",                                     "Use auto-configured parallel search (highly nondeterministic runtimes)")
+			("verbose",										 "Print out progress of solve");
 
         po::options_description problem_options{ "Problem options" };
         problem_options.add_options()
@@ -289,6 +290,9 @@ auto main(int argc, char * argv[]) -> int
             }
         }
 
+		if (options_vars.count("verbose"))
+			params.verbose = true;
+
         // A boolean indicating whether we are using target equivalence
         params.using_target_equivalence = (params.target_equivalence == TargetEquivalence::Structural
 										|| params.target_equivalence == TargetEquivalence::Candidate
@@ -408,15 +412,18 @@ auto main(int argc, char * argv[]) -> int
             cout << "proof_log = " << fn << ".log" << suffix << endl;
         }
 		
-		cout << "pattern_mapping = ";
-		for (int i = 0; i < pattern.size(); i++)
-			cout << i << " " << pattern.vertex_name(i) << " ";
-		cout << endl;
+		if (params.verbose)
+		{
+			cout << "pattern_mapping = ";
+			for (int i = 0; i < pattern.size(); i++)
+				cout << i << " " << pattern.vertex_name(i) << " ";
+			cout << endl;
 
-		cout << "target_mapping = ";
-		for (int i = 0; i < target.size(); i++)
-			cout << i << " " << target.vertex_name(i) << " ";
-		cout << endl;
+			cout << "target_mapping = ";
+			for (int i = 0; i < target.size(); i++)
+				cout << i << " " << target.vertex_name(i) << " ";
+			cout << endl;
+		}
 
         cout << "pattern_vertices = " << pattern.size() << endl;
         cout << "pattern_directed_edges = " << pattern.number_of_directed_edges() << endl;

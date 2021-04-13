@@ -116,6 +116,9 @@ struct HomomorphismParams
 
 	// bool indicating if we are using target equivalence
     bool using_target_equivalence = false;
+
+	// Verbosity of solve
+	bool verbose = false;
 };
 
 struct HomomorphismResult

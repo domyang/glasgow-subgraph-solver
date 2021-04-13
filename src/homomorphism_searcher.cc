@@ -131,7 +131,8 @@ auto HomomorphismSearcher::restore_assignments(HomomorphismAssignments &assignme
     for (int i=assignments.values.size()-1; i >= (int) assignments_size; i--)
     {
         assigned_pattern_vertices[assignments.values[i].assignment.pattern_vertex] = false;
-        std::cout << "Unmapping " << assignments.values[i].assignment.pattern_vertex << " from " << assignments.values[i].assignment.target_vertex << std::endl;
+		if (params.verbose)
+        	std::cout << "Unmapping " << assignments.values[i].assignment.pattern_vertex << " from " << assignments.values[i].assignment.target_vertex << std::endl;
         if (params.using_target_equivalence)
             model.down_target_num_used(assignments.values[i].assignment.target_vertex);
     }
@@ -202,7 +203,8 @@ auto HomomorphismSearcher::restarting_search(
                 else
                     count = 1;
 
-                std::cout << count << " solutions found." << std::endl;
+				if (params.verbose)
+                	std::cout << count << " solutions found." << std::endl;
                 solution_count += count;
 
                 if (params.enumerate_callback) {
@@ -288,7 +290,8 @@ auto HomomorphismSearcher::restarting_search(
         // modified in-place by appending, we can restore by shrinking
         auto assignments_size = assignments.values.size();
 
-        std::cout << "Mapping " << branch_domain->v << " to " << *f_v << std::endl;
+		if (params.verbose)
+        	std::cout << "Mapping " << branch_domain->v << " to " << *f_v << std::endl;
 
         // make the assignment
         assignments.values.push_back({ { branch_domain->v, unsigned(*f_v) }, true, discrepancy_count, int(branch_v_end) });
@@ -829,7 +832,8 @@ auto HomomorphismSearcher::propagate(Domains & new_domains, HomomorphismAssignme
             // This is to prevent duplicate assignments appearing in the list
             if (!assigned_pattern_vertices[current_assignment->pattern_vertex])
             {
-                std::cout << "Mapping " << current_assignment->pattern_vertex << " to " << current_assignment->target_vertex << std::endl;
+				if (params.verbose)
+                	std::cout << "Mapping " << current_assignment->pattern_vertex << " to " << current_assignment->target_vertex << std::endl;
                 assignments.values.push_back({ *current_assignment, false, -1, -1 });
                 assigned_pattern_vertices[current_assignment->pattern_vertex] = true;
                 if (params.using_target_equivalence)
