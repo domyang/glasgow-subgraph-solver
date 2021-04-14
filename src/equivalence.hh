@@ -144,30 +144,16 @@ class DisjointSet
             if (&other == this)
                 return *this;
 
-            parents.reserve(other.count);
-            sizes.reserve(other.count);
-            num_used.reserve(other.count);
-            for (unsigned i = 0; i < count; i++)
-            {
-                parents[i] = other.parents[i];
-                sizes[i] = other.sizes[i];
-                num_used[i] = other.num_used[i];
-            }
+            parents = other.parents;
+            sizes = other.sizes;
+            num_used = other.num_used;
             multiplier = other.multiplier;
             has_multiplier = other.has_multiplier;
 
             return *this;
         }
 
-        void copy_equivalence(const DisjointSet &other)
-        {
-            for (unsigned i = 0; i < count; i++)
-            {
-                parents[i] = other.parents[i];
-                sizes[i] = other.parents[i];
-            }
-            has_multiplier = false;
-        }
+		auto operator=(DisjointSet &&other) -> DisjointSet& = default;
 };
 
 #endif

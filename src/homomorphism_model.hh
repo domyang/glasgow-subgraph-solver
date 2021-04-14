@@ -102,7 +102,7 @@ class HomomorphismModel
 		auto target_representative(int t) const -> int;
 
         auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
-        auto restore_equivalence(const DisjointSet &target_equivalence) -> void;
+        auto restore_equivalence(DisjointSet &target_equivalence) -> void;
 
         auto get_target_num_used(int x) -> unsigned;
         auto up_target_num_used(int x) -> void;

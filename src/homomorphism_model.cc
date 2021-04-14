@@ -1171,9 +1171,9 @@ auto HomomorphismModel::merge_target_classes(int x, int y) -> void
     _imp->target_equivalence.merge(x, y);
 }
 
-auto HomomorphismModel::restore_equivalence(const DisjointSet &target_equivalence) -> void
+auto HomomorphismModel::restore_equivalence(DisjointSet &target_equivalence) -> void
 {
-    _imp->target_equivalence = target_equivalence;
+    _imp->target_equivalence = std::move(target_equivalence);
 }
 
 auto HomomorphismModel::get_target_num_used(int x) -> unsigned
