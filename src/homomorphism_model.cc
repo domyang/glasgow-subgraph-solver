@@ -1035,7 +1035,6 @@ auto HomomorphismModel::_is_target_structurally_equivalent(int x, int y) const -
 
 auto HomomorphismModel::_build_structural_equivalence(bool is_pattern) -> void
 {
-    std::vector<bool> visited(pattern_size, false);
     std::queue<unsigned> queue;
     if (is_pattern)
         _imp->pattern_equivalence.add_elems(pattern_size);
@@ -1043,6 +1042,9 @@ auto HomomorphismModel::_build_structural_equivalence(bool is_pattern) -> void
         _imp->target_equivalence.add_elems(target_size);
    
     unsigned size = is_pattern ? pattern_size : target_size;
+    std::vector<bool> visited(size, false);
+    // A vector to mark vertices we have already categorized
+    std::vector<bool> categorized(size, false);
 
     for (unsigned i = 0; i < size; i++)
     {
@@ -1059,10 +1061,12 @@ auto HomomorphismModel::_build_structural_equivalence(bool is_pattern) -> void
             // Construct neighbor set for the current vertex
             SVOBitset nv;
             if (!directed())
+            {
                 if (is_pattern)
                     nv = pattern_graph_row(0, curr_vert);
                 else
                     nv = target_graph_row(0, curr_vert);
+            }
             else
             {
                 if (is_pattern)
@@ -1076,34 +1080,42 @@ auto HomomorphismModel::_build_structural_equivalence(bool is_pattern) -> void
                     nv |= reverse_target_graph_row(curr_vert);
                 }
             }
+
+            // Remove any already categorized neighbor from the list.
+            for (auto x : nv)
+                if (categorized[x])
+                    nv.reset(x);
             
             // Partition the neighbors into equivalence sets
-            for (auto x : nv)
+            for (auto it = nv.begin(); it != nv.end(); it++)
             {
-                for (auto y : nv)
+                auto x = *it;
+                for (auto it2 = it+1; it2 != nv.end(); it2++)
                 {
-                    if (x >= y) continue;
-                        if (is_pattern)
-                        {
-                            if (_is_pattern_structurally_equivalent(x, y))
-                                _imp->pattern_equivalence.merge(x, y);
-                        }
-                        else
-                            if (_is_target_structurally_equivalent(x, y))
-                                _imp->target_equivalence.merge(x, y);
-                }
-                {
+                    auto y = *it2;
                     if (is_pattern)
                     {
-                        if (_is_pattern_structurally_equivalent(curr_vert, x))
-                            _imp->pattern_equivalence.merge(curr_vert, x);
+                        if (_is_pattern_structurally_equivalent(x, y))
+                            _imp->pattern_equivalence.merge(x, y);
                     }
                     else
-                        if (_is_target_structurally_equivalent(curr_vert, x))
-                            _imp->target_equivalence.merge(curr_vert, x);
+                        if (_is_target_structurally_equivalent(x, y))
+                            _imp->target_equivalence.merge(x, y);
                 }
+                // Check if it is equivalent to the current vertex
+                if (is_pattern)
+                {
+                    if (_is_pattern_structurally_equivalent(curr_vert, x))
+                        _imp->pattern_equivalence.merge(curr_vert, x);
+                }
+                else
+                    if (_is_target_structurally_equivalent(curr_vert, x))
+                        _imp->target_equivalence.merge(curr_vert, x);
                 if (!visited[x])
                     queue.push(x);
+
+                // mark as categorized
+                categorized[x] = true;
             }
 
         }
@@ -1126,7 +1138,7 @@ auto HomomorphismModel::is_target_equivalent(int p, int q) const -> bool
 
 auto HomomorphismModel::get_target_equivalence() const -> const DisjointSet&
 {
-	return _imp->target_equivalence;
+    return _imp->target_equivalence;
 }
 
 auto HomomorphismModel::pattern_representative(int p) const -> int
@@ -1156,25 +1168,25 @@ auto HomomorphismModel::target_equivalence_multiplier() const -> loooong
 
 auto HomomorphismModel::merge_target_classes(int x, int y) -> void
 {
-	_imp->target_equivalence.merge(x, y);
+    _imp->target_equivalence.merge(x, y);
 }
 
 auto HomomorphismModel::restore_equivalence(const DisjointSet &target_equivalence) -> void
 {
-	_imp->target_equivalence = target_equivalence;
+    _imp->target_equivalence = target_equivalence;
 }
 
 auto HomomorphismModel::get_target_num_used(int x) -> unsigned
 {
-	return _imp->target_equivalence.get_num_used(x);
+    return _imp->target_equivalence.get_num_used(x);
 }
 
 auto HomomorphismModel::up_target_num_used(int x) -> void
 {
-	_imp->target_equivalence.up_num_used(x);
+    _imp->target_equivalence.up_num_used(x);
 }
 
 auto HomomorphismModel::down_target_num_used(int x) -> void
 {
-	_imp->target_equivalence.down_num_used(x);
+    _imp->target_equivalence.down_num_used(x);
 }
