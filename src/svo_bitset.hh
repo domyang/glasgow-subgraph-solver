@@ -125,30 +125,33 @@ class SVOBitset
 
         auto find_first_after(int a) const -> unsigned
         {
-			unsigned start = a / bits_per_word;
-			unsigned offset = a % bits_per_word + 1;
-            if (! _is_long()) {
-                int x = __builtin_ffsll(_data.short_data[start] >> offset);
-                if (x != 0)
-                        return start * bits_per_word + x + offset - 1;
-                for (unsigned i = start + 1 ; i < n_words ; ++i) {
-                    x = __builtin_ffsll(_data.short_data[i]);
-                    if (0 != x)
-                        return i * bits_per_word + x - 1;
-                }
-                return npos;
+            unsigned start = a / bits_per_word;
+            unsigned offset = a % bits_per_word + 1;
+
+            // If at the end of a word, move to the next word.
+            if (offset == bits_per_word)
+            {
+                start++;
+                // If at end of data, return.
+                if (start == n_words)
+                    return npos;
+                offset = 0;
             }
-            else {
-                int x = __builtin_ffsll(_data.long_data[start] >> offset);
-                if (x != 0)
-                        return start * bits_per_word + x + offset - 1;
-                for (unsigned i = start+1, i_end = n_words ; i < i_end ; ++i) {
-                    x = __builtin_ffsll(_data.long_data[i]);
-                    if (0 != x)
-                        return i * bits_per_word + x - 1;
-                }
-                return npos;
+
+            auto data = _is_long() ? _data.long_data : _data.short_data;
+
+            // We shift to find our current position.
+            int x = __builtin_ffsll(data[start] >> offset);
+            if (x != 0)
+                return start * bits_per_word + x + offset - 1;
+
+            for (unsigned i = start + 1 ; i < n_words ; ++i) 
+            {
+                x = __builtin_ffsll(data[i]);
+                if (0 != x)
+                    return i * bits_per_word + x - 1;
             }
+            return npos;
         }
 
         auto reset(int a) -> void
@@ -210,21 +213,21 @@ class SVOBitset
             if (! _is_long()) {
                 for (unsigned i = 0 ; i < svo_size ; ++i)
                     if (_data.short_data[i] != other._data.short_data[i])
-						return false;
+                        return false;
             }
             else {
                 for (unsigned i = 0 ; i < n_words ; ++i)
                     if (_data.long_data[i] != other._data.long_data[i])
-						return false;
+                        return false;
             }
 
             return true;
         }
 
-		auto operator!= (const SVOBitset & other) -> bool
-		{
-			return !(*this == other);
-		}
+        auto operator!= (const SVOBitset & other) -> bool
+        {
+            return !(*this == other);
+        }
 
         auto intersect_with_complement(const SVOBitset & other) -> void
         {
@@ -262,6 +265,7 @@ class SVOBitset
 
             Iterator& operator++() {pos = bitset.find_first_after(pos); return *this;}
             Iterator& operator++(int) {pos = bitset.find_first_after(pos); return *this;}
+            Iterator operator+(int x) const {Iterator iter(this->bitset, pos+x); iter.pos = bitset.find_first_after(pos+x-1); return iter;}
             friend bool operator==(const Iterator& a, const Iterator& b){return a.pos == b.pos;}
             friend bool operator!=(const Iterator& a, const Iterator& b){return a.pos != b.pos;}
 
@@ -296,7 +300,7 @@ class SVOBitset
         Iterator end() {return Iterator(*this, npos);}
         ConstIterator cbegin() const {int pos = find_first(); return ConstIterator(*this, pos);}
         ConstIterator cend() const {return ConstIterator(*this, npos);}
-		
+        
 };
 
 #endif
