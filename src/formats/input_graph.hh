@@ -7,6 +7,9 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <set> 
+#include <map>
+#include <tuple>
 #include <string_view>
 
 /**
@@ -27,6 +30,7 @@ class InputGraph
          * \param initial_size can be 0, if resize() is called afterwards.
          */
         InputGraph(int initial_size, bool has_vertex_labels, bool has_edge_labels);
+        InputGraph(int initial_size, bool has_vertex_labels, bool has_edge_labels, bool directed, bool loopy);
 
         InputGraph(const InputGraph &) = delete;
 
@@ -55,14 +59,21 @@ class InputGraph
         auto resize(int size) -> void;
 
         /**
-         * Add an edge from a to b (and from b to a).
+         * Add edges in both directions for each labeled edge.
          */
+        auto add_edges(std::vector<std::tuple<int, int, std::string>> & edges ) -> void;
+
         auto add_edge(int a, int b) -> void;
+
+        /**
+         * Add edge in both directions.
+         */
+        auto add_edge(int a, int b, std::string label) -> void;
 
         /**
          * Add a directed edge from a to b, with a label.
          */
-        auto add_directed_edge(int a, int b, std::string_view label) -> void;
+        auto add_directed_edge(int a, int b, std::string label) -> void;
 
         /**
          * Are vertices a and b adjacent?
@@ -104,13 +115,21 @@ class InputGraph
         /**
          * What is the label associated with a given edge?
          */
-        auto edge_label(int a, int b) const -> std::string_view;
+        auto edge_label(int a, int b) const -> std::multiset<std::string>;
 
         auto has_edge_labels() const -> bool;
 
         auto directed() const -> bool;
 
-        auto for_each_edge(const std::function<auto (int, int, std::string_view) -> void> &) const -> void;
+        using EdgesIterator = std::map<std::pair<int, int>, std::multiset<std::string>>::const_iterator;
+        
+		auto edges() const -> std::map<std::pair<int, int>, std::multiset<std::string> >;
+
+        auto begin_edges() const -> EdgesIterator;
+
+        auto end_edges() const -> EdgesIterator;
+
+        auto for_each_edge(const std::function<auto (int, int, std::multiset<std::string>) -> void> &) const -> void;
 };
 
 #endif

@@ -27,7 +27,7 @@ namespace
         unordered_map<string, int> vertices;
         unordered_map<string, string> vertex_labels;
         vector<tuple<int, int, string> > edges;
-        bool seen_vertex_label = false, seen_edge_label = false, seen_directed_edge = false;
+        bool seen_vertex_label = false, seen_edge_label = false, seen_directed_edge = false, seen_loopy_edge = false;
 
         string line;
 
@@ -57,8 +57,11 @@ namespace
                 int left_idx = vertices.emplace(left, vertices.size()).first->second;
                 int right_idx = vertices.emplace(right, vertices.size()).first->second;
 
+                if (left_idx == right_idx)
+                    seen_loopy_edge = true;
+
                 if (! label.empty())
-                    seen_edge_label = true;
+                    seen_directed_edge = seen_edge_label = true;
 
                 if (delim == '>') {
                     seen_directed_edge = true;
@@ -71,7 +74,7 @@ namespace
             }
         }
 
-        InputGraph result{ int(vertices.size()), seen_vertex_label, seen_edge_label };
+        InputGraph result{ int(vertices.size()), seen_vertex_label, seen_edge_label, seen_directed_edge, seen_loopy_edge };
 
         for (auto & [ f, t, l ] : edges)
             if (seen_directed_edge)
@@ -81,7 +84,7 @@ namespace
                 result.add_directed_edge(t, f, l);
             }
             else
-                result.add_edge(f, t);
+                result.add_edge(f, t, l);
 
         auto rename = [&] (const string & s) -> string {
             if (rename_map) {
@@ -129,5 +132,3 @@ auto read_csv_name(std::ifstream && infile, const std::string & filename, const 
 
     return read_csv(move(infile), filename, rename_map);
 }
-
-

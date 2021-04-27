@@ -19,12 +19,17 @@ class HomomorphismModel
         struct Imp;
         std::unique_ptr<Imp> _imp;
 
+        std::vector<std::vector<bool> > edge_label_compatibility;
+
         auto _build_exact_path_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx,
                 unsigned number_of_exact_path_graphs, bool directed) -> void;
 
         auto _build_distance3_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
 
         auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
+
+        auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx, std::string &str) -> void;
+		auto _build_channel_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx, const InputGraph &graph, std::string &str) -> void;
 
         auto _build_structural_equivalence(bool is_pattern) -> void;
 
@@ -37,9 +42,24 @@ class HomomorphismModel
                 bool do_not_do_nds_yet
                 ) const -> bool;
 
+		auto _check_multi_degree_compatibility(
+				int p,
+				int t,
+				std::vector<std::vector<std::vector<int> > > & patterns_mdss,
+				std::vector<std::vector<std::vector<int> > > & targets_mdss
+				) const -> bool;
+
         auto _check_loop_compatibility(int p, int t) const -> bool;
 
         auto _check_label_compatibility(int p, int t) const -> bool;
+
+        auto _check_vertex_label_compatibility(const int p, const int t) const -> bool;
+
+        auto _multiset_item_counts(const std::multiset<std::string>&) const -> std::map<std::string, int>;
+
+        auto _populate_degrees(std::vector<std::vector<int> > & degrees, const std::vector<SVOBitset> & graph_rows, int size) -> void;
+
+        auto _record_edge_labels(std::map<std::multiset<std::string>, int>& label_map, const InputGraph & graph, std::vector<int>& graph_edge_labels) -> void;
 
 		auto _is_pattern_structurally_equivalent(int p, int q) const -> bool;
 		auto _is_target_structurally_equivalent(int p, int q) const -> bool;
@@ -47,7 +67,7 @@ class HomomorphismModel
     public:
         using PatternAdjacencyBitsType = uint8_t;
 
-        const unsigned max_graphs;
+        unsigned max_graphs;
         unsigned pattern_size, target_size;
 
         auto has_less_thans() const -> bool;
@@ -85,9 +105,6 @@ class HomomorphismModel
         auto pattern_edge_label(int p, int q) const -> int;
         auto target_edge_label(int t, int u) const -> int;
 
-        auto pattern_has_loop(int p) const -> bool;
-        auto target_has_loop(int t) const -> bool;
-
 		auto is_pattern_equivalent(int p, int q) const -> bool;
 		auto is_target_equivalent(int p, int q) const -> bool;
 
@@ -107,6 +124,12 @@ class HomomorphismModel
         auto get_target_num_used(int x) -> unsigned;
         auto up_target_num_used(int x) -> void;
         auto down_target_num_used(int x) -> void;
+
+        auto check_edge_label_compatibility(const std::multiset<std::string>&, const std::multiset<std::string>&) const -> bool;
+        auto check_edge_label_compatibility(const int t_v1, const int t_v2, const int p_lid) const -> bool;
+
+        auto num_pattern_loops(int p) const -> int;
+        auto num_target_loops(int t) const -> int;
 };
 
 #endif

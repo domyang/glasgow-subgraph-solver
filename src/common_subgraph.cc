@@ -19,6 +19,7 @@ using std::make_optional;
 using std::make_unique;
 using std::map;
 using std::min;
+using std::multiset;
 using std::nullopt;
 using std::optional;
 using std::pair;
@@ -75,10 +76,10 @@ namespace
             SplitDomains result;
 
             for (auto & [ l, r ] : d.partitions) {
-                map<tuple<bool, bool, string_view, string_view>, pair<set<int>, set<int> > > new_partitions;
+                map<tuple<bool, bool, multiset<string>, multiset<string>>, pair<set<int>, set<int> > > new_partitions;
 
-                string no_label;
-                auto partition_of = [&] (const InputGraph & g, int w, int v) -> tuple<bool, bool, string_view, string_view> {
+                multiset<string> no_label;
+                auto partition_of = [&] (const InputGraph & g, int w, int v) -> tuple<bool, bool, multiset<string>, multiset<string>> {
                     return tuple{
                         g.adjacent(w, v),
                         g.adjacent(v, w),

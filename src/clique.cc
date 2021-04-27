@@ -14,6 +14,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <set>
 
 using std::conditional_t;
 using std::find;
@@ -23,9 +24,11 @@ using std::list;
 using std::make_tuple;
 using std::mt19937;
 using std::move;
+using std::multiset;
 using std::pair;
 using std::reverse;
 using std::sort;
+using std::string;
 using std::string_view;
 using std::swap;
 using std::to_string;
@@ -102,7 +105,7 @@ namespace
             // pre-calculate degrees
             vector<int> degrees;
             degrees.resize(size);
-            g.for_each_edge([&] (int f, int, string_view) { ++degrees[f]; });
+            g.for_each_edge([&] (int f, int, multiset<string>) { ++degrees[f]; });
 
             // sort on degree
             if (! params.input_order)
@@ -112,7 +115,7 @@ namespace
             for (unsigned i = 0 ; i < order.size() ; ++i)
                 invorder[order[i]] = i;
 
-            g.for_each_edge([&] (int f, int t, string_view) { adj[invorder[f]].set(invorder[t]); });
+            g.for_each_edge([&] (int f, int t, multiset<string>) { adj[invorder[f]].set(invorder[t]); });
 
             if (params.connected) {
                 connected_table.resize(size);

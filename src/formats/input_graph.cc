@@ -10,6 +10,9 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <map>
+#include <tuple>
+#include <set>
 
 #include <boost/bimap.hpp>
 #include <boost/bimap/unordered_set_of.hpp>
@@ -24,6 +27,8 @@ using std::numeric_limits;
 using std::make_optional;
 using std::make_pair;
 using std::map;
+using std::multiset;
+using std::tuple;
 using std::max;
 using std::move;
 using std::nullopt;
@@ -53,11 +58,24 @@ struct InputGraph::Imp
 {
     int size = 0;
     bool has_vertex_labels, has_edge_labels;
-    map<pair<int, int>, string> edges;
+    map<pair<int, int>, multiset<string> > edges;
     vector<string> vertex_labels;
     Names vertex_names;
     bool loopy = false, directed = false;
 };
+
+InputGraph::InputGraph(int size, bool has_vertex_labels, bool has_edge_labels,
+    bool directed, bool loopy):
+    _imp(new Imp{ })
+{
+    _imp->has_vertex_labels = has_vertex_labels;
+    _imp->has_edge_labels = has_edge_labels;
+    _imp->directed = directed;
+    _imp->loopy = loopy;
+
+    if (0 != size)
+        resize(size);
+}
 
 InputGraph::InputGraph(int size, bool v, bool e) :
     _imp(new Imp{ })
@@ -81,23 +99,33 @@ auto InputGraph::resize(int size) -> void
     _imp->vertex_labels.resize(size);
 }
 
+auto InputGraph::add_edges(vector<tuple<int, int, string>> & edges ) -> void
+{
+    for (auto & [ a, b, label ] : edges)
+        add_edge(a, b, label);
+}
+
 auto InputGraph::add_edge(int a, int b) -> void
 {
-    _imp->edges.emplace(make_pair(a, b), "");
-    _imp->edges.emplace(make_pair(b, a), "");
+    multiset<string> label_multiset;
+    _imp->edges.emplace(make_pair(a, b), label_multiset);
+    _imp->edges.emplace(make_pair(b, a), label_multiset);
     if (a == b)
         _imp->loopy = true;
 }
 
-auto InputGraph::add_directed_edge(int a, int b, string_view label) -> void
+auto InputGraph::add_edge(int a, int b, string label) -> void
 {
-    sanity_check_name(label, "edge label");
+    add_directed_edge(a, b, label);
+    add_directed_edge(b, a, label);
+}
 
-    _imp->directed = true;
-
-    _imp->edges.emplace(make_pair(a, b), label).first->second = label;
-    if (a == b)
-        _imp->loopy = true;
+auto InputGraph::add_directed_edge(int a, int b, string label) -> void
+{
+    // Add edge. Append to label vector if edge already exists.
+    multiset<string> label_multiset;
+    auto edge_emplace = _imp->edges.emplace(make_pair(a, b), label_multiset);
+    edge_emplace.first->second.insert(label);
 }
 
 auto InputGraph::adjacent(int a, int b) const -> bool
@@ -162,9 +190,24 @@ auto InputGraph::vertex_from_name(string_view n) const -> optional<int>
         return make_optional(it->second);
 }
 
-auto InputGraph::edge_label(int a, int b) const -> string_view
+auto InputGraph::edge_label(int a, int b) const -> multiset<string>
 {
     return _imp->edges.find({a, b})->second;
+}
+
+auto InputGraph::begin_edges() const -> InputGraph::EdgesIterator
+{
+    return _imp->edges.begin();
+}
+
+auto InputGraph::edges() const -> map<pair<int, int>, multiset<string> >
+{
+    return _imp->edges;
+}
+
+auto InputGraph::end_edges() const -> InputGraph::EdgesIterator
+{
+    return _imp->edges.end();
 }
 
 auto InputGraph::has_vertex_labels() const -> bool
@@ -182,8 +225,9 @@ auto InputGraph::directed() const -> bool
     return _imp->directed;
 }
 
-auto InputGraph::for_each_edge(const function<auto (int, int, std::string_view) -> void> & c) const -> void
+auto InputGraph::for_each_edge(const function<auto (int, int, std::multiset<std::string>) -> void> & c) const -> void
 {
+	
     for (auto & [ e, l ] : _imp->edges)
         c(e.first, e.second, l);
 }

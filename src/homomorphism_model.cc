@@ -7,6 +7,7 @@
 #include "loooong.hh"
 #include "graph_equivalence.hh"
 
+#include <algorithm>
 #include <functional>
 #include <queue>
 #include <list>
@@ -23,6 +24,7 @@ using std::max;
 using std::optional;
 using std::pair;
 using std::set;
+using std::multiset;
 using std::string;
 using std::string_view;
 using std::to_string;
@@ -43,11 +45,15 @@ struct HomomorphismModel::Imp
 {
     const HomomorphismParams & params;
 
+	const InputGraph &pattern;
+	const InputGraph &target;
+
     vector<PatternAdjacencyBitsType> pattern_adjacencies_bits;
     vector<SVOBitset> pattern_graph_rows, forward_pattern_graph_rows, reverse_pattern_graph_rows;
     vector<SVOBitset> target_graph_rows, forward_target_graph_rows, reverse_target_graph_rows;
 
     vector<vector<int> > patterns_degrees, targets_degrees;
+	map<string,vector<int> > patterns_multi_degrees, targets_multi_degrees;
     int largest_target_degree = 0;
     bool has_less_thans = false, has_occur_less_thans = false, directed = false;
 
@@ -58,21 +64,24 @@ struct HomomorphismModel::Imp
     DisjointSet target_equivalence;
 
     vector<string> pattern_vertex_proof_names, target_vertex_proof_names;
+    
+	map<multiset<string>, int> pattern_edge_labels_map, target_edge_labels_map;
+	
+	set<string> channels;
 
-    Imp(const HomomorphismParams & p) :
-        params(p)
+    Imp(const HomomorphismParams & p, const InputGraph &pat, const InputGraph &tar ) :
+        params(p), pattern(pat), target(tar)
     {
     }
 };
 
 HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph & pattern, const HomomorphismParams & params) :
-    _imp(new Imp(params)),
+    _imp(new Imp(params, pattern, target)),
     max_graphs(calculate_n_shape_graphs(params)),
     pattern_size(pattern.size()),
     target_size(target.size())
 {
-    _imp->patterns_degrees.resize(max_graphs);
-    _imp->targets_degrees.resize(max_graphs);
+
 
     if (max_graphs > 8 * sizeof(PatternAdjacencyBitsType))
         throw UnsupportedConfiguration{ "Supplemental graphs won't fit in the chosen bitset size" };
@@ -84,8 +93,38 @@ HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph
             _imp->target_vertex_proof_names.push_back(target.vertex_name(v));
     }
 
-    if (pattern.directed())
-        _imp->directed = true;
+    _imp->directed = pattern.directed();
+
+	if (pattern.has_edge_labels())
+	{
+		// Map each unique edge_label to an integer.
+		// Resize vector recording integers corresponding to each edge's label.
+		//TODO: move line below into function?
+		_imp->pattern_edge_labels.resize(pattern_size * pattern_size);
+		// Fill edge_labels_map labels -> int and edge_labels with labels.
+		_record_edge_labels(_imp->pattern_edge_labels_map, pattern, _imp->pattern_edge_labels);
+		
+		// Resize vector recording integers corresponding to each edge's label.
+		_imp->target_edge_labels.resize(target_size * target_size);
+		// Fill edge_labels_map labels -> int and edge_labels with labels.
+		_record_edge_labels(_imp->target_edge_labels_map, target, _imp->target_edge_labels);
+
+		for (auto it = pattern.begin_edges(); it != pattern.end_edges(); it++)
+			for (auto str : it->second)
+				_imp->channels.emplace(str);
+
+		max_graphs += _imp->channels.size();
+		for (auto str : _imp->channels)
+		{
+			vector<int> p_degrees(pattern_size, 0);
+			vector<int> t_degrees(target_size, 0);
+			_imp->patterns_multi_degrees.emplace(str, p_degrees);
+			_imp->targets_multi_degrees.emplace(str, t_degrees);
+		}
+	}
+
+    _imp->patterns_degrees.resize(max_graphs);
+    _imp->targets_degrees.resize(max_graphs);
 
     // recode pattern to a bit graph, and strip out loops
     _imp->pattern_graph_rows.resize(pattern_size * max_graphs, SVOBitset(pattern_size, 0));
@@ -94,24 +133,14 @@ HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph
         for (unsigned j = 0 ; j < pattern_size ; ++j) {
             if (pattern.adjacent(i, j)) {
                 if (i == j)
-                    _imp->pattern_loops[i] = 1;
+                    _imp->pattern_loops[i] += 1;
                 else
                     _imp->pattern_graph_rows[i * max_graphs + 0].set(j);
             }
         }
     }
+	
 
-    // if directed, do both directions
-    if (pattern.directed()) {
-        _imp->forward_pattern_graph_rows.resize(pattern_size, SVOBitset{ target_size, 0 });
-        _imp->reverse_pattern_graph_rows.resize(pattern_size, SVOBitset{ target_size, 0 });
-        pattern.for_each_edge([&] (int f, int t, string_view l) {
-            if (f != t && l != "unlabelled") {
-                _imp->forward_pattern_graph_rows[f].set(t);
-                _imp->reverse_pattern_graph_rows[t].set(f);
-            }
-        });
-    }
 
     // re-encode and store pattern labels
     map<string, int> vertex_labels_map;
@@ -125,47 +154,8 @@ HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph
         _imp->pattern_vertex_labels.resize(pattern_size);
         for (unsigned i = 0 ; i < pattern_size ; ++i)
             _imp->pattern_vertex_labels[i] = vertex_labels_map.find(string{ pattern.vertex_label(i) })->second;
-    }
-
-    // re-encode and store edge labels
-    map<string, int> edge_labels_map;
-    int next_edge_label = 1;
-    if (pattern.has_edge_labels()) {
-        _imp->pattern_edge_labels.resize(pattern_size * pattern_size);
-        for (unsigned i = 0 ; i < pattern_size ; ++i)
-            for (unsigned j = 0 ; j < pattern_size ; ++j)
-                if (pattern.adjacent(i, j)) {
-                    auto r = edge_labels_map.emplace(pattern.edge_label(i, j), next_edge_label);
-                    if (r.second)
-                        ++next_edge_label;
-                    _imp->pattern_edge_labels[i * pattern_size + j] = r.first->second;
-                }
-    }
-
-    // recode target to a bit graph, and take out loops
-    _imp->target_graph_rows.resize(target_size * max_graphs, SVOBitset{ target_size, 0 });
-    _imp->target_loops.resize(target_size);
-    target.for_each_edge([&] (int f, int t, string_view) {
-        if (f == t)
-            _imp->target_loops[f] = 1;
-        else
-            _imp->target_graph_rows[f * max_graphs + 0].set(t);
-    });
-
-    // if directed, do both directions
-    if (pattern.directed()) {
-        _imp->forward_target_graph_rows.resize(target_size, SVOBitset{ target_size, 0 });
-        _imp->reverse_target_graph_rows.resize(target_size, SVOBitset{ target_size, 0 });
-        target.for_each_edge([&] (int f, int t, string_view l) {
-            if (f != t && l != "unlabelled") {
-                _imp->forward_target_graph_rows[f].set(t);
-                _imp->reverse_target_graph_rows[t].set(f);
-            }
-        });
-    }
-
-    // target vertex labels
-    if (pattern.has_vertex_labels()) {
+		
+		// target vertex labels
         for (unsigned i = 0 ; i < target_size ; ++i) {
             if (vertex_labels_map.emplace(target.vertex_label(i), next_vertex_label).second)
                 ++next_vertex_label;
@@ -176,17 +166,75 @@ HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph
             _imp->target_vertex_labels[i] = vertex_labels_map.find(string{ target.vertex_label(i) })->second;
     }
 
-    // target edge labels
-    if (pattern.has_edge_labels()) {
-        _imp->target_edge_labels.resize(target_size * target_size);
-        target.for_each_edge([&] (int f, int t, string_view l) {
-            auto r = edge_labels_map.emplace(l, next_edge_label);
-            if (r.second)
-                ++next_edge_label;
-
-            _imp->target_edge_labels[f * target_size + t] = r.first->second;
-        });
+//    // re-encode and store edge labels
+//    map<string, int> edge_labels_map;
+//    int next_edge_label = 1;
+//    if (pattern.has_edge_labels()) {
+//        _imp->pattern_edge_labels.resize(pattern_size * pattern_size);
+//        for (unsigned i = 0 ; i < pattern_size ; ++i)
+//            for (unsigned j = 0 ; j < pattern_size ; ++j)
+//                if (pattern.adjacent(i, j)) {
+//                    auto r = edge_labels_map.emplace(pattern.edge_label(i, j), next_edge_label);
+//                    if (r.second)
+//                        ++next_edge_label;
+//                    _imp->pattern_edge_labels[i * pattern_size + j] = r.first->second;
+//                }
+//    }
+	
+    // // TODO: Find better way to get indices.
+    // Form edge compatibility matrix.
+    // std::cout<< "Compat table" << std::endl;
+    edge_label_compatibility.resize(_imp->pattern_edge_labels_map.size(), vector<bool>(_imp->target_edge_labels_map.size()));
+    for (const auto& [labels1, label1_id] : _imp->pattern_edge_labels_map) {
+        for (const auto& [labels2, label2_id] : _imp->target_edge_labels_map) {
+            // TODO: Deal with the induced case.
+            edge_label_compatibility[label1_id][label2_id] = check_edge_label_compatibility(labels1, labels2);
+        }
     }
+
+    // recode target to a bit graph, and take out loops
+    _imp->target_graph_rows.resize(target_size * max_graphs, SVOBitset{ target_size, 0 });
+    _imp->target_loops.resize(target_size);
+    for (auto e = target.begin_edges(), e_end = target.end_edges() ; e != e_end ; ++e) {
+        if (e->first.first == e->first.second)
+            _imp->target_loops[e->first.first] += 1;
+        else
+            _imp->target_graph_rows[e->first.first * max_graphs + 0].set(e->first.second);
+    }
+
+    // if directed, do both directions
+    if (pattern.directed()) {
+        _imp->forward_pattern_graph_rows.resize(pattern_size, SVOBitset{ pattern_size, 0 });
+        _imp->reverse_pattern_graph_rows.resize(pattern_size, SVOBitset{ pattern_size, 0 });
+        for (auto e = pattern.begin_edges(), e_end = pattern.end_edges() ; e != e_end ; ++e) {
+            if (e->first.first != e->first.second) {
+                _imp->forward_pattern_graph_rows[e->first.first].set(e->first.second);
+                _imp->reverse_pattern_graph_rows[e->first.second].set(e->first.first);
+            }
+        }
+
+        _imp->forward_target_graph_rows.resize(target_size, SVOBitset{ target_size, 0 });
+        _imp->reverse_target_graph_rows.resize(target_size, SVOBitset{ target_size, 0 });
+        for (auto e = target.begin_edges(), e_end = target.end_edges() ; e != e_end ; ++e) {
+            if (e->first.first != e->first.second) {
+                _imp->forward_target_graph_rows[e->first.first].set(e->first.second);
+                _imp->reverse_target_graph_rows[e->first.second].set(e->first.first);
+            }
+        }
+    }
+
+
+//    // target edge labels
+//    if (pattern.has_edge_labels()) {
+//        _imp->target_edge_labels.resize(target_size * target_size);
+//        target.for_each_edge([&] (int f, int t, string_view l) {
+//            auto r = edge_labels_map.emplace(l, next_edge_label);
+//            if (r.second)
+//                ++next_edge_label;
+//
+//            _imp->target_edge_labels[f * target_size + t] = r.first->second;
+//        });
+//    }
 
     auto decode = [&] (const InputGraph & g, string_view s) -> int {
         auto n = g.vertex_from_name(s);
@@ -256,6 +304,53 @@ HomomorphismModel::HomomorphismModel(const InputGraph & target, const InputGraph
     }
 }
 
+/** Record map from label sets to integers and vertex adjacencies to integers.*/
+auto HomomorphismModel::_record_edge_labels(map<multiset<string>, int>& label_map, const InputGraph & graph, vector<int>& graph_edge_labels) -> void
+{
+    int next_edge_label = 0;
+    for (auto e = graph.begin_edges(), e_end = graph.end_edges() ; e != e_end ; ++e) {
+        auto r = label_map.emplace(e->second, next_edge_label);
+        // Increase count if we have seen a new edge.
+        if (r.second)
+            ++next_edge_label;
+        // Record label_set integer code.
+        graph_edge_labels[e->first.first * graph.size() + e->first.second] = r.first->second;
+    }
+}
+
+auto HomomorphismModel::_multiset_item_counts(const multiset<string>& labels) const -> map<string, int>
+{
+    map<string, int> label_counts;
+    for (const auto & label : labels) {
+        if (!label_counts.emplace(label, 1).second)
+            label_counts.emplace(label, 1).first->second += 1;
+    }
+    return label_counts;
+}
+
+/** Check that at least as many of each label occur for the target as pattern edge.
+TODO: Change to exact count for induced case.
+*/
+auto HomomorphismModel::check_edge_label_compatibility(const multiset<string>& labels1, const multiset<string>& labels2) const -> bool
+{
+    // Map labels to the number of occurences for each multiset.
+    map<string, int> label_counts1 = _multiset_item_counts(labels1);
+    map<string, int> label_counts2 = _multiset_item_counts(labels2);
+
+    // Check compatibility for each label.
+    for (const auto & [label, count] : label_counts1) {
+        if (label_counts2.find(label) == label_counts2.end() || count > label_counts2[label])
+            return false;
+    }
+    return true;
+}
+
+auto HomomorphismModel::check_edge_label_compatibility(const int t_v1, const int t_v2, const int p_lid) const -> bool
+{
+    int t_lid = target_edge_label(t_v1, t_v2);
+    return edge_label_compatibility[p_lid][t_lid];
+}
+
 HomomorphismModel::~HomomorphismModel() = default;
 
 auto HomomorphismModel::_check_label_compatibility(int p, int t) const -> bool
@@ -268,9 +363,9 @@ auto HomomorphismModel::_check_label_compatibility(int p, int t) const -> bool
 
 auto HomomorphismModel::_check_loop_compatibility(int p, int t) const -> bool
 {
-    if (pattern_has_loop(p) && ! target_has_loop(t))
+    if (num_pattern_loops(p) > num_target_loops(t))
         return false;
-    else if (_imp->params.induced && (pattern_has_loop(p) != target_has_loop(t)))
+    else if (_imp->params.induced && (num_pattern_loops(p) != num_target_loops(t)))
         return false;
 
     return true;
@@ -380,6 +475,44 @@ auto HomomorphismModel::_check_degree_compatibility(
     return true;
 }
 
+auto HomomorphismModel::_check_multi_degree_compatibility(
+        int p,
+        int t,
+        vector<vector<vector<int> > > & patterns_mdss,
+        vector<vector<vector<int> > > & targets_mdss
+        ) const -> bool
+{
+    if (! degree_and_nds_are_preserved(_imp->params))
+		return true;
+	
+	for (auto str : _imp->channels)
+	{
+		if (_imp->targets_multi_degrees.at(str).at(t) < _imp->patterns_multi_degrees.at(str).at(p)) {
+			return false;
+		}
+		else if (degree_and_nds_are_exact(_imp->params, pattern_size, target_size)
+				&& _imp->targets_multi_degrees.at(str).at(t) != _imp->patterns_multi_degrees.at(str).at(p)) {
+			// not ok, degrees must be exactly the same
+			return false;
+		}
+	}
+    if (_imp->params.no_nds)
+        return true;
+
+    for (unsigned i = 0; i < _imp->channels.size(); i++) {
+        for (unsigned x = 0 ; x < patterns_mdss.at(i).at(p).size() ; ++x) {
+            if (targets_mdss.at(i).at(t).at(x) < patterns_mdss.at(i).at(p).at(x)) {
+                return false;
+            }
+            else if (degree_and_nds_are_exact(_imp->params, pattern_size, target_size)
+                    && targets_mdss.at(i).at(t).at(x) != patterns_mdss.at(i).at(p).at(x))
+                return false;
+        }
+    }
+	
+    return true;
+}
+
 auto HomomorphismModel::initialise_domains(vector<HomomorphismDomain> & domains) const -> bool
 {
     unsigned graphs_to_consider = max_graphs;
@@ -387,6 +520,9 @@ auto HomomorphismModel::initialise_domains(vector<HomomorphismDomain> & domains)
     /* pattern and target neighbourhood degree sequences */
     vector<vector<vector<int> > > patterns_ndss(graphs_to_consider);
     vector<vector<optional<vector<int> > > > targets_ndss(graphs_to_consider);
+
+    vector<vector<vector<int> > > patterns_mdss(_imp->channels.size());
+    vector<vector<vector<int> > > targets_mdss(_imp->channels.size());
 
     if (degree_and_nds_are_preserved(_imp->params) && ! _imp->params.no_nds) {
         for (unsigned g = 0 ; g < graphs_to_consider ; ++g) {
@@ -404,6 +540,33 @@ auto HomomorphismModel::initialise_domains(vector<HomomorphismDomain> & domains)
                 sort(patterns_ndss.at(g).at(i).begin(), patterns_ndss.at(g).at(i).end(), greater<int>());
             }
         }
+
+		if (has_edge_labels())
+		{
+			int ch = 0;
+			for (auto str : _imp->channels)
+			{
+				patterns_mdss.at(ch).resize(pattern_size);
+				targets_mdss.at(ch).resize(target_size);
+				
+				for (unsigned i = 0 ; i < pattern_size ; ++i) {
+					auto ni = pattern_graph_row(0, i);
+					for (auto j : ni) {
+						patterns_mdss.at(ch).at(i).push_back(_imp->patterns_multi_degrees.at(str).at(j));
+					}
+					sort(patterns_mdss.at(ch).at(i).begin(), patterns_mdss.at(ch).at(i).end(), greater<int>());
+				}
+
+				for (unsigned i = 0 ; i < target_size ; ++i) {
+					auto ni = target_graph_row(0, i);
+					for (auto j : ni) {
+						targets_mdss.at(ch).at(i).push_back(_imp->targets_multi_degrees.at(str).at(j));
+					}
+					sort(targets_mdss.at(ch).at(i).begin(), targets_mdss.at(ch).at(i).end(), greater<int>());
+				}
+				ch++;
+			}
+		}
     }
 
     for (unsigned i = 0 ; i < pattern_size ; ++i) {
@@ -419,6 +582,8 @@ auto HomomorphismModel::initialise_domains(vector<HomomorphismDomain> & domains)
                 ok = false;
             else if (! _check_degree_compatibility(i, j, graphs_to_consider, patterns_ndss, targets_ndss, _imp->params.proof.get()))
                 ok = false;
+			else if (has_edge_labels() && ! _check_multi_degree_compatibility(i, j, patterns_mdss, targets_mdss))
+				ok = false;
 
             if (ok)
                 domains.at(i).values.set(j);
@@ -521,10 +686,27 @@ auto HomomorphismModel::prepare() -> bool
     _imp->targets_degrees.at(0).resize(target_size);
 
     for (unsigned i = 0 ; i < pattern_size ; ++i)
+	{
         _imp->patterns_degrees.at(0).at(i) = _imp->pattern_graph_rows[i * max_graphs + 0].count();
+	}
 
-    for (unsigned i = 0 ; i < target_size ; ++i)
+	for (unsigned i = 0 ; i < target_size ; ++i)
         _imp->targets_degrees.at(0).at(i) = _imp->target_graph_rows[i * max_graphs + 0].count();
+
+	if (has_edge_labels())
+	{
+		for (unsigned i = 0; i < pattern_size; i++)
+			for (auto j : _imp->pattern_graph_rows[i * max_graphs + 0])
+				for (auto label : _imp->pattern.edge_label(i, j))
+					_imp->patterns_multi_degrees.at(label).at(i)++;
+
+		for (unsigned i = 0; i < target_size; i++)
+			for (auto j : _imp->target_graph_rows[i * max_graphs + 0])
+				for (auto label : _imp->target.edge_label(i, j))
+					_imp->targets_multi_degrees.at(label).at(i)++;
+	}
+
+
 
     if (global_degree_is_preserved(_imp->params)) {
         vector<pair<int, int> > p_gds, t_gds;
@@ -648,6 +830,15 @@ auto HomomorphismModel::prepare() -> bool
         _build_k4_graphs(_imp->pattern_graph_rows, pattern_size, next_pattern_supplemental);
         _build_k4_graphs(_imp->target_graph_rows, target_size, next_target_supplemental);
     }
+
+	if (has_edge_labels())
+	{
+		for (auto str : _imp->channels)
+		{
+			_build_channel_graphs(_imp->pattern_graph_rows, pattern_size, next_pattern_supplemental, _imp->pattern, str);
+			_build_channel_graphs(_imp->target_graph_rows, target_size, next_target_supplemental, _imp->target, str);
+		}
+	}
 
     if (next_pattern_supplemental != max_graphs || next_target_supplemental != max_graphs)
         throw UnsupportedConfiguration{ "something has gone wrong with supplemental graph indexing: " + to_string(next_pattern_supplemental)
@@ -774,6 +965,19 @@ auto HomomorphismModel::_build_k4_graphs(vector<SVOBitset> & graph_rows, unsigne
     ++idx;
 }
 
+auto HomomorphismModel::_build_channel_graphs(vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx, const InputGraph &graph, string &str) -> void
+{
+	for (auto it = graph.begin_edges(); it != graph.end_edges(); it++)
+	{
+		int src = it->first.first;
+		int dst = it->first.second;
+		if (it->second.find(str) != it->second.end())
+			graph_rows[src * max_graphs + idx].set(dst);
+    }
+
+    ++idx;
+}
+
 auto HomomorphismModel::pattern_adjacency_bits(int p, int q) const -> PatternAdjacencyBitsType
 {
     return _imp->pattern_adjacencies_bits[pattern_size * p + q];
@@ -854,12 +1058,12 @@ auto HomomorphismModel::target_edge_label(int t, int u) const -> int
     return _imp->target_edge_labels[t * target_size + u];
 }
 
-auto HomomorphismModel::pattern_has_loop(int p) const -> bool
+auto HomomorphismModel::num_pattern_loops(int p) const -> int
 {
     return _imp->pattern_loops[p];
 }
 
-auto HomomorphismModel::target_has_loop(int t) const -> bool
+auto HomomorphismModel::num_target_loops(int t) const -> int
 {
     return _imp->target_loops[t];
 }
@@ -887,7 +1091,7 @@ auto HomomorphismModel::_is_pattern_structurally_equivalent(int x, int y) const 
     auto ny = pattern_graph_row(0, y);
     
     // Both must have or not have loops
-    if (pattern_has_loop(x) != pattern_has_loop(y))
+    if (num_pattern_loops(x) != num_pattern_loops(y))
         return false;
 
     if (has_vertex_labels())
@@ -965,7 +1169,7 @@ auto HomomorphismModel::_is_target_structurally_equivalent(int x, int y) const -
     auto ny = target_graph_row(0, y);
     
     // Both must have or not have loops
-    if (target_has_loop(x) != target_has_loop(y))
+    if (num_target_loops(x) != num_target_loops(y))
         return false;
 
     if (has_vertex_labels())
