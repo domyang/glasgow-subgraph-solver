@@ -10,6 +10,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@ using std::exception;
 using std::greater;
 using std::istreambuf_iterator;
 using std::map;
+using std::multiset;
 using std::ostreambuf_iterator;
 using std::pair;
 using std::sort;
@@ -98,7 +100,7 @@ auto main(int argc, char * argv[]) -> int
         map<pair<int, int>, int> numberings;
 
         if (degree) {
-            pattern.for_each_edge([&] (int f, int t, string_view) {
+            pattern.for_each_edge([&] (int f, int t, multiset<string>) {
                 if (f != t) {
                     pattern_degrees[f]++;
                     pattern_ndss[f].push_back(t);
@@ -111,7 +113,7 @@ auto main(int argc, char * argv[]) -> int
                 sort(pattern_ndss[v].begin(), pattern_ndss[v].end(), greater<int>());
             }
 
-            target.for_each_edge([&] (int f, int t, string_view) {
+            target.for_each_edge([&] (int f, int t, multiset<string>) {
                 if (f != t) {
                     target_degrees[f]++;
                     target_ndss[f].push_back(t);
