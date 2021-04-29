@@ -7,6 +7,7 @@
 #include <array>
 #include <cstring>
 #include <limits>
+#include "svo_vector.hh"
 
 class SVOBitset
 {
@@ -196,6 +197,45 @@ class SVOBitset
 
         auto operator|= (const SVOBitset & other) -> SVOBitset &
         {
+			for (auto x : other)
+				set(x)
+
+            return *this;
+        }
+
+        auto operator&= (const SVOVector & other) -> SVOBitset &
+        {
+			unsigned bit = find_first()
+			for (auto x : other)
+			{
+				// Reset all bits between x and element before x
+				// After this while loop, bit should be strictly larger than x
+				while (true)
+				{
+					if (bit >= x)
+					{
+						if (bit == x)
+							bit = find_first_after(bit);
+						break;
+					}
+
+					reset(bit);
+					bit = find_first_after(bit);
+				}
+			}
+
+			// Reset all bits after last x in other
+			while (bit != npos)
+			{
+				reset(bit);
+				bit = find_first_after(bit);
+			}
+
+            return *this;
+        }
+
+        auto operator|= (const SVOVector & other) -> SVOBitset &
+        {
             if (! _is_long()) {
                 for (unsigned i = 0 ; i < svo_size ; ++i)
                     _data.short_data[i] |= other._data.short_data[i];
@@ -239,6 +279,12 @@ class SVOBitset
                 for (unsigned i = 0 ; i < n_words ; ++i)
                     _data.long_data[i] &= ~other._data.long_data[i];
             }
+        }
+
+        auto intersect_with_complement(const SVOVector & other) -> void
+        {
+			for (auto x : other)
+				reset(x);
         }
 
         auto count() const -> unsigned
