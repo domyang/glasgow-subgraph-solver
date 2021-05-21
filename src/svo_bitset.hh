@@ -195,19 +195,20 @@ class SVOBitset
             return *this;
         }
 
-        auto operator|= (const SVOBitset & other) -> SVOBitset &
+        auto operator|= (const SVOVector & other) -> SVOBitset &
         {
-			for (auto x : other)
-				set(x)
+			for (auto iter = other.cbegin(); iter != other.cend(); iter++)
+				set(*iter);
 
             return *this;
         }
 
         auto operator&= (const SVOVector & other) -> SVOBitset &
         {
-			unsigned bit = find_first()
-			for (auto x : other)
+			unsigned bit = find_first();
+			for (auto iter = other.cbegin(); iter != other.cend(); iter++)
 			{
+				unsigned x = *iter;
 				// Reset all bits between x and element before x
 				// After this while loop, bit should be strictly larger than x
 				while (true)
@@ -234,7 +235,7 @@ class SVOBitset
             return *this;
         }
 
-        auto operator|= (const SVOVector & other) -> SVOBitset &
+        auto operator|= (const SVOBitset & other) -> SVOBitset &
         {
             if (! _is_long()) {
                 for (unsigned i = 0 ; i < svo_size ; ++i)
@@ -283,8 +284,8 @@ class SVOBitset
 
         auto intersect_with_complement(const SVOVector & other) -> void
         {
-			for (auto x : other)
-				reset(x);
+			for (auto iter = other.cbegin(); iter != other.cend(); iter++)
+				reset(*iter);
         }
 
         auto count() const -> unsigned

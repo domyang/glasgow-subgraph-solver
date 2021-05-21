@@ -12,6 +12,7 @@
 #include "equivalence.hh"
 
 #include <memory>
+#include <boost/functional/hash.hpp>
 
 class HomomorphismModel
 {
@@ -21,17 +22,17 @@ class HomomorphismModel
 
         std::vector<std::vector<bool> > edge_label_compatibility;
 
-        auto _build_exact_path_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx,
+        auto _build_exact_path_graphs(std::vector<SVOVector> & graph_rows, unsigned size, unsigned & idx,
                 unsigned number_of_exact_path_graphs, bool directed) -> void;
 
-        auto _build_distance3_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
+        auto _build_distance3_graphs(std::vector<SVOVector> & graph_rows, unsigned size, unsigned & idx) -> void;
 
-        auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx) -> void;
+        auto _build_k4_graphs(std::vector<SVOVector> & graph_rows, unsigned size, unsigned & idx) -> void;
 
-        auto _build_k4_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx, std::string &str) -> void;
-		auto _build_channel_graphs(std::vector<SVOBitset> & graph_rows, unsigned size, unsigned & idx, const InputGraph &graph, std::string &str) -> void;
+        auto _build_k4_graphs(std::vector<SVOVector> & graph_rows, unsigned size, unsigned & idx, std::string &str) -> void;
+		auto _build_channel_graphs(std::vector<SVOVector> & graph_rows, unsigned & idx, const InputGraph &graph, std::string &str) -> void;
 
-        auto _build_structural_equivalence(bool is_pattern) -> void;
+        auto _build_structural_equivalence(bool is_pattern, std::vector<HomomorphismDomain> &domains) -> void;
 
         auto _check_degree_compatibility(
                 int p,
@@ -42,12 +43,6 @@ class HomomorphismModel
                 bool do_not_do_nds_yet
                 ) const -> bool;
 
-		auto _check_multi_degree_compatibility(
-				int p,
-				int t,
-				std::vector<std::vector<std::vector<int> > > & patterns_mdss,
-				std::vector<std::vector<std::vector<int> > > & targets_mdss
-				) const -> bool;
 
         auto _check_loop_compatibility(int p, int t) const -> bool;
 
@@ -55,17 +50,28 @@ class HomomorphismModel
 
         auto _check_vertex_label_compatibility(const int p, const int t) const -> bool;
 
+		auto _check_multi_degree_compatibility(std::vector<HomomorphismDomain> &domains) const -> void;
+
+        auto _check_nbr_compatibility(std::vector<HomomorphismDomain> &domains) const -> void;
+
+        auto topology_filter(std::vector<HomomorphismDomain> &domains) const -> void;
+
+        auto compute_stats(std::vector<std::map<std::string,std::vector<int>>> &stats, unsigned graph_size, 
+                           const InputGraph &graph, std::vector<SVOVector> &graph_rows) -> void;
+
+        auto stats_filter(std::vector<HomomorphismDomain> &domains) const -> void;
+
         auto _multiset_item_counts(const std::multiset<std::string>&) const -> std::map<std::string, int>;
 
-        auto _populate_degrees(std::vector<std::vector<int> > & degrees, const std::vector<SVOBitset> & graph_rows, int size) -> void;
+        auto _populate_degrees(std::vector<std::vector<int> > & degrees, const std::vector<SVOVector> & graph_rows, int size) -> void;
 
-        auto _record_edge_labels(std::map<std::multiset<std::string>, int>& label_map, const InputGraph & graph, std::vector<int>& graph_edge_labels) -> void;
+        auto _record_edge_labels(std::map<std::multiset<std::string>, int>& label_map, const InputGraph & graph, std::unordered_map<std::pair<int,int>,int, boost::hash<std::pair<int,int>>>& graph_edge_labels) -> void;
 
 		auto _is_pattern_structurally_equivalent(int p, int q) const -> bool;
 		auto _is_target_structurally_equivalent(int p, int q) const -> bool;
 
     public:
-        using PatternAdjacencyBitsType = uint8_t;
+        using PatternAdjacencyBitsType = uint64_t;
 
         unsigned max_graphs;
         unsigned pattern_size, target_size;
@@ -83,15 +89,15 @@ class HomomorphismModel
         auto prepare() -> bool;
 
         auto pattern_adjacency_bits(int p, int q) const -> PatternAdjacencyBitsType;
-        auto pattern_graph_row(int g, int p) const -> const SVOBitset &;
+        auto pattern_graph_row(int g, int p) const -> const SVOVector &;
 
-        auto forward_pattern_graph_row(int t) const -> const SVOBitset &;
-        auto reverse_pattern_graph_row(int t) const -> const SVOBitset &;
+        auto forward_pattern_graph_row(int t) const -> const SVOVector &;
+        auto reverse_pattern_graph_row(int t) const -> const SVOVector &;
 
-        auto target_graph_row(int g, int t) const -> const SVOBitset &;
+        auto target_graph_row(int g, int t) const -> const SVOVector &;
 
-        auto forward_target_graph_row(int t) const -> const SVOBitset &;
-        auto reverse_target_graph_row(int t) const -> const SVOBitset &;
+        auto forward_target_graph_row(int t) const -> const SVOVector &;
+        auto reverse_target_graph_row(int t) const -> const SVOVector &;
 
         auto pattern_degree(int g, int p) const -> unsigned;
         auto target_degree(int g, int t) const -> unsigned;
@@ -118,7 +124,7 @@ class HomomorphismModel
 		auto pattern_representative(int p) const -> int;
 		auto target_representative(int t) const -> int;
 
-        auto initialise_domains(std::vector<HomomorphismDomain> & domains) const -> bool;
+        auto initialise_domains(std::vector<HomomorphismDomain> & domains) -> bool;
         auto restore_equivalence(DisjointSet &target_equivalence) -> void;
 
         auto get_target_num_used(int x) -> unsigned;

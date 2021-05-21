@@ -550,7 +550,7 @@ auto HomomorphismSearcher::propagate_adjacency_constraints(HomomorphismDomain & 
     // and for each remaining graph pair...
     for (unsigned g = 1 ; g < model.max_graphs ; ++g) {
         // if we're adjacent...
-        if (graph_pairs_to_consider & (1u << g)) {
+        if (graph_pairs_to_consider & ((uint64_t) 1u << g)) {
             // ...then we can only be mapped to adjacent vertices
             d.values &= model.target_graph_row(g, current_assignment.target_vertex);
         }
@@ -572,7 +572,7 @@ auto HomomorphismSearcher::propagate_adjacency_constraints(HomomorphismDomain & 
         }
 
         const auto & reverse_edge_graph_pairs_to_consider = model.pattern_adjacency_bits(d.v, current_assignment.pattern_vertex);
-        if (reverse_edge_graph_pairs_to_consider & (1u << 0)) {
+        if (reverse_edge_graph_pairs_to_consider & ((uint64_t) 1u << 0)) {
             auto check_d_values = d.values;
 
             auto reverse_pattern_edge_lid = model.pattern_edge_label(d.v, current_assignment.pattern_vertex);
@@ -931,7 +931,7 @@ auto HomomorphismSearcher::assigned_cover() const -> bool
         if (assigned_pattern_vertices[i])
             continue;
 
-        SVOBitset nv;
+        SVOVector nv;
         if (!model.directed())
             nv = model.pattern_graph_row(0, i);
         else

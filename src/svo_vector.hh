@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <iostream>
 #include <limits>
 #include <vector>
 
@@ -18,18 +19,17 @@ class SVOVector
 
         SVOVector() : _data() {}
 
-        SVOVector(const SVOVector & other) : _data(other._data)
+        SVOVector(const SVOVector & other) : _data(other._data) {}
 
         auto operator= (const SVOVector & other) -> SVOVector &
         {
             if (&other == this)
                 return *this;
 
-			_data = other.data;
+			_data = other._data;
 
             return *this;
         }
-
 
         auto any() const -> bool
         {
@@ -38,7 +38,7 @@ class SVOVector
 
         auto find_first() const -> unsigned
         {
-			if (any())
+			if (!any())
 				return npos;
 			return _data.front();
         }
@@ -69,15 +69,60 @@ class SVOVector
         {
 			// find first element larger than a
 			auto iter = std::lower_bound(_data.begin(), _data.end(), a);
-			_data.insert(iter, a);
+
+			if ((iter == _data.end()) || (*iter != (unsigned) a))
+				_data.insert(iter, a);
         }
 
         auto test(int a) const -> bool
         {
 			// find first element larger or equal to a
 			auto iter = std::lower_bound(_data.begin(), _data.end(), a);
+			if (iter == _data.end())
+				return false;
+		
 			// If they are equal, a is in the vector
-			return *iter == a;
+			return *iter == (unsigned) a;
+        }
+
+        auto operator|= (const SVOVector & other) -> SVOVector &
+        {
+			for (auto iter = other.cbegin(); iter != other.cend(); iter++)
+				set(*iter);
+
+            return *this;
+        }
+
+        auto operator&= (const SVOVector & other) -> SVOVector &
+        {
+			unsigned bit = find_first();
+			for (auto iter = other.cbegin(); iter != other.cend(); iter++)
+			{
+				unsigned x = *iter;
+				// Reset all bits between x and element before x
+				// After this while loop, bit should be strictly larger than x
+				while (true)
+				{
+					if (bit >= x)
+					{
+						if (bit == x)
+							bit = find_first_after(bit);
+						break;
+					}
+
+					reset(bit);
+					bit = find_first_after(bit);
+				}
+			}
+
+			// Reset all bits after last x in other
+			while (bit != npos)
+			{
+				reset(bit);
+				bit = find_first_after(bit);
+			}
+
+            return *this;
         }
 
         auto operator== (const SVOVector & other) -> bool
@@ -95,9 +140,9 @@ class SVOVector
 			return _data.size();
         }
 
-		auto begin() -> std::vector<unsigned>::iterator {return _data.begin()}
+		auto begin() -> std::vector<unsigned>::iterator {return _data.begin();}
         auto end() -> std::vector<unsigned>::iterator {return _data.end();}
-        auto cbegin() const -> std::vector<unsigned>::const_iterator {return _data.cbegin()}
+        auto cbegin() const -> std::vector<unsigned>::const_iterator {return _data.cbegin();}
         auto cend() const -> std::vector<unsigned>::const_iterator {return _data.cend();}
         
 };
