@@ -62,6 +62,7 @@ struct InputGraph::Imp
     vector<string> vertex_labels;
     Names vertex_names;
     bool loopy = false, directed = false;
+	int n_edges = 0;
 };
 
 InputGraph::InputGraph(int size, bool has_vertex_labels, bool has_edge_labels,
@@ -110,6 +111,7 @@ auto InputGraph::add_edge(int a, int b) -> void
     multiset<string> label_multiset;
     _imp->edges.emplace(make_pair(a, b), label_multiset);
     _imp->edges.emplace(make_pair(b, a), label_multiset);
+	_imp->n_edges += 2;
     if (a == b)
         _imp->loopy = true;
 }
@@ -126,6 +128,7 @@ auto InputGraph::add_directed_edge(int a, int b, string label) -> void
     multiset<string> label_multiset;
     auto edge_emplace = _imp->edges.emplace(make_pair(a, b), label_multiset);
     edge_emplace.first->second.insert(label);
+	_imp->n_edges++;
 }
 
 auto InputGraph::adjacent(int a, int b) const -> bool
@@ -140,7 +143,7 @@ auto InputGraph::size() const -> int
 
 auto InputGraph::number_of_directed_edges() const -> int
 {
-    return _imp->edges.size();
+    return _imp->n_edges;
 }
 
 auto InputGraph::loopy() const -> bool

@@ -362,6 +362,9 @@ auto main(int argc, char * argv[]) -> int
         auto pattern = read_file_format(pattern_format_name, options_vars["pattern-file"].as<string>());
         auto target = read_file_format(target_format_name, options_vars["target-file"].as<string>());
 
+        auto read_time = system_clock::to_time_t(system_clock::now());
+        cout << "read_graphs_at = " << put_time(localtime(&read_time), "%F %T") << endl;
+
         cout << "pattern_file = " << options_vars["pattern-file"].as<string>() << endl;
         cout << "target_file = " << options_vars["target-file"].as<string>() << endl;
 
