@@ -54,12 +54,6 @@ class HomomorphismModel
 
         auto _check_nbr_compatibility(std::vector<HomomorphismDomain> &domains) const -> void;
 
-        auto topology_filter(std::vector<HomomorphismDomain> &domains) const -> void;
-
-        auto compute_stats(std::vector<std::map<std::string,std::vector<int>>> &stats, unsigned graph_size, 
-                           const InputGraph &graph, std::vector<SVOVector> &graph_rows) -> void;
-
-        auto stats_filter(std::vector<HomomorphismDomain> &domains) const -> void;
 
         auto _multiset_item_counts(const std::multiset<std::string>&) const -> std::map<std::string, int>;
 
@@ -136,6 +130,13 @@ class HomomorphismModel
 
         auto num_pattern_loops(int p) const -> int;
         auto num_target_loops(int t) const -> int;
+
+        auto topology_filter(std::vector<HomomorphismDomain> &domains) const -> void;
+
+        auto compute_stats(std::vector<std::map<std::string,std::vector<int>>> &stats, unsigned graph_size, 
+                           const InputGraph &graph, std::vector<SVOVector> &graph_rows) -> void;
+
+        auto stats_filter(std::vector<HomomorphismDomain> &domains) const -> void;
 };
 
 #endif

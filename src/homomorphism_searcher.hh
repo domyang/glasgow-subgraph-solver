@@ -126,6 +126,11 @@ class HomomorphismSearcher
                 unsigned branch_v_end,
                 bool reverse
                 ) -> void;
+        
+        auto equivalence_sort(
+                std::vector<int> & branch_v,
+                unsigned branch_v_end
+                ) -> void;
 
         auto assigned_cover() const -> bool;
         

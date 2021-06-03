@@ -167,6 +167,9 @@ auto HomomorphismSearcher::restarting_search(
 
     ++nodes;
 
+    if (model.has_edge_labels())
+        model.topology_filter(domains);
+
     // find ourselves a domain, or succeed if we're all assigned
     HomomorphismDomain * branch_domain = find_branch_domain(domains);
     if (! branch_domain) {
@@ -246,6 +249,10 @@ auto HomomorphismSearcher::restarting_search(
 
         case ValueOrdering::Random:
             shuffle(branch_v.begin(), branch_v.begin() + branch_v_end, global_rand);
+            break;
+        
+        case ValueOrdering::Equivalence:
+            equivalence_sort(branch_v, branch_v_end);
             break;
     }
 
@@ -412,6 +419,18 @@ auto HomomorphismSearcher::degree_sort(
             });
 }
 
+auto HomomorphismSearcher::equivalence_sort(
+        vector<int> & branch_v,
+        unsigned branch_v_end
+        ) -> void
+{
+    stable_sort(branch_v.begin(), branch_v.begin() + branch_v_end);
+    stable_sort(branch_v.begin(), branch_v.begin() + branch_v_end, [&] (int a, int b) -> bool {
+            return (model.target_class_size(a) - model.get_target_num_used(a)
+                    > model.target_class_size(b) - model.get_target_num_used(b));
+            });
+}
+
 auto HomomorphismSearcher::softmax_shuffle(
         vector<int> & branch_v,
         unsigned branch_v_end
@@ -477,8 +496,8 @@ auto HomomorphismSearcher::copy_nonfixed_domains_and_make_assignment(
     Domains new_domains;
     new_domains.reserve(domains.size());
     for (auto & d : domains) {
-        if (d.fixed)
-            continue;
+        //if (d.fixed)
+        //    continue;
 
         new_domains.push_back(d);
         if (d.v == branch_v) {

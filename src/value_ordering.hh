@@ -8,7 +8,8 @@ enum class ValueOrdering
     Biased,
     Degree,
     AntiDegree,
-    Random
+    Random,
+    Equivalence
 };
 
 #endif

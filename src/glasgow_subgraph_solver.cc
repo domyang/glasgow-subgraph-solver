@@ -254,6 +254,8 @@ auto main(int argc, char * argv[]) -> int
                 params.value_ordering_heuristic = ValueOrdering::AntiDegree;
             else if (value_ordering_heuristic == "random")
                 params.value_ordering_heuristic = ValueOrdering::Random;
+            else if (value_ordering_heuristic == "equivalence")
+                params.value_ordering_heuristic = ValueOrdering::Equivalence;
             else {
                 cerr << "Unknown value-ordering heuristic '" << value_ordering_heuristic << "'" << endl;
                 return EXIT_FAILURE;
