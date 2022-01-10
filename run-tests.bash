@@ -57,5 +57,40 @@ if ! grep '^solution_count = 0$' <(./glasgow_subgraph_solver --count-solutions -
     exit 1
 fi
 
+if ! grep '^representative_solution_count = 18$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv ) ; then
+    echo "No-equivalence Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 9$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --pattern-equivalence=structural) ; then
+    echo "Pattern Structural Equivalence Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 10$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --target-equivalence=structural) ; then
+    echo "Target Structural Equivalence Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 6$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --pattern-equivalence=structural --target-equivalence=structural) ; then
+    echo "Pattern+Target Structural Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 5$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --target-equivalence=candidate) ; then
+    echo "Candidate Equivalence Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 2$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --target-equivalence=full) ; then
+    echo "Full Candidate Equivalence Test Failed" 1>&1
+    exit 1
+fi
+
+if ! grep '^representative_solution_count = 2$' <(./glasgow_subgraph_solver --count-solutions --format csv test-instances/equiv_pattern.csv test-instances/equiv_target.csv --target-equivalence=full) ; then
+    echo "Node Cover Equivalence Test Failed" 1>&1
+    exit 1
+fi
+
 true
 
