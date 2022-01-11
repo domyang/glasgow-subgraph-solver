@@ -5,7 +5,6 @@
 #include "graph_equivalence.hh"
 #include "sip_decomposer.hh"
 #include "lackey.hh"
-#include "symmetries.hh"
 #include "restarts.hh"
 #include "verify.hh"
 #include "proof.hh"
@@ -435,34 +434,6 @@ auto main(int argc, char * argv[]) -> int
 
         /* Start the clock */
         params.start_time = steady_clock::now();
-
-        if (options_vars.count("pattern-symmetries")) {
-            auto gap_start_time = steady_clock::now();
-            find_symmetries(argv[0], pattern, params.pattern_less_constraints, pattern_automorphism_group_size);
-            was_given_pattern_automorphism_group = true;
-            cout << "pattern_symmetry_time = " << duration_cast<milliseconds>(steady_clock::now() - gap_start_time).count() << endl;
-            cout << "pattern_less_constraints =";
-            for (auto & [ a, b ] : params.pattern_less_constraints)
-                cout << " " << a << "<" << b;
-            cout << endl;
-        }
-
-        if (was_given_pattern_automorphism_group)
-            cout << "pattern_automorphism_group_size = " << pattern_automorphism_group_size << endl;
-
-        if (options_vars.count("target-symmetries")) {
-            auto gap_start_time = steady_clock::now();
-            find_symmetries(argv[0], target, params.target_occur_less_constraints, target_automorphism_group_size);
-            was_given_target_automorphism_group = true;
-            cout << "target_symmetry_time = " << duration_cast<milliseconds>(steady_clock::now() - gap_start_time).count() << endl;
-            cout << "target_occur_less_constraints =";
-            for (auto & [ a, b ] : params.target_occur_less_constraints)
-                cout << " " << a << "<" << b;
-            cout << endl;
-        }
-
-        if (was_given_target_automorphism_group)
-            cout << "target_automorphism_group_size = " << target_automorphism_group_size << endl;
 
         auto result = options_vars.count("decomposition") ?
             solve_sip_by_decomposition(pattern, target, params) :
