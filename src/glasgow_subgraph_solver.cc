@@ -306,18 +306,6 @@ auto main(int argc, char * argv[]) -> int
         params.no_supplementals = options_vars.count("no-supplementals");
         params.no_nds = options_vars.count("no-nds");
 
-        string pattern_automorphism_group_size = "1", target_automorphism_group_size = "1";
-        bool was_given_pattern_automorphism_group = false, was_given_target_automorphism_group = false;
-        if (options_vars.count("pattern-automorphism-group-size")) {
-            pattern_automorphism_group_size = options_vars["pattern-automorphism-group-size"].as<string>();
-            was_given_pattern_automorphism_group = true;
-        }
-
-        if (options_vars.count("target-automorphism-group-size")) {
-            target_automorphism_group_size = options_vars["target-automorphism-group-size"].as<string>();
-            was_given_target_automorphism_group = true;
-        }
-
         for (auto & s : pattern_less_thans) {
             auto p = s.find('<');
             if (p == string::npos) {
