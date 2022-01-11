@@ -1,79 +1,87 @@
-The Glasgow Subgraph Solver
-===========================
+The Equivalence Boosted Glasgow Subgraph Solver
+============================================
 
-This is a solver for subgraph isomorphism (induced and non-induced) problems, based upon a series of
-papers by subsets of Blair Archibald, Ciaran McCreesh, Patrick Prosser and James Trimble at the
-University of Glasgow, and Fraser Dunlop and Ruth Hoffmann at the University of St Andrews. A clique
-decision / maximum clique solver is also included.
+This is an adapted version of the Glasgow Subgraph solver used for the subgraph isomorphism problem.
+This software is adapted to handle multiplex multichannel graphs as well as incorporate structural
+equivalence-inspired ideas for acceleration of solve time and better understanding of the solution space.
 
-If you use this software for research, please cite [icgt/McCreeshPT20]. If you use this solver in a
-non-research setting, please get in touch if you can. This software is an output of taxpayer funded
-research, and it is very helpful for us if we can demonstrate real-world impact when we write grant
-applications.
+These adaptations were made by Dominic Yang, Jacob Moorman, and Denali Molitor
+at University of California, Los Angeles. The original solver on which these adaptations are built was
+based on papers by Blair Archibald, Ciaran McCreesh, Patrick Prosser and James Trimble at the University
+of Glasgow, Fraser Dunlop and Ruth Hoffman at the University of St Andrews.
+The original solver can be found at [this Github page](https://github.com/ciaranm/glasgow-subgraph-solver).
 
-Please contact [Ciaran McCreesh](mailto:ciaran.mccreesh@glasgow.ac.uk) with any queries.
+Any questions about this software should be referred to [Dominic Yang](mailto:domyang@math.ucla.edu)
 
-Compiling
+Structural Equivalence in Subgraph Isomorphism
+--------------
+
+Subgraph Isomorphism is the task of finding a copy of a small pattern graph within a larger target graph.
+We wish to assign every pattern vertex to an associated target vertex while ensuring that the target vertices
+have the same neighborhood structure apparent in the pattern. For example, the mapping (A->1, B->2, C->3) is
+such a mapping but (A->1, B->2, C->6) is not because 6 is not adjacent to 1 while C is adjacent to A.
+We wish to accelerate the state-of-the-art solver Glasgow by incorporating structural equivalence into
+the algorithm.
+
+Structural Equivalence, in the simplest terms, is the property of vertices of a graph having the exact
+same neighborhood. For example, in the above figure, vertices B and C would be structurally equivalent
+for they share the same neighbor, namely A. It is under these circumstances, that we can interchange 
+pattern vertex assignments in any subgraph isomorphism to produce a new one. 
+
+We can go further by acknowledging, that in many circumstances, certain edges are effectively irrelevant
+to subgraph search, and obscure structural equivalence. To explain what we mean by this, consider mapping
+vertex A to vertex 1. In order to ensure a subgraph isomorphism, we need only assign B and C to any
+vertex adjacent to 1; any edges between the neighbors only obscures the similarity and are thus irrelevant.
+The task of determining *relevancy* is difficult and will be expounded upon in an associated paper
+to this package.
+
+Installation
 ---------
 
-To build, type 'make'. You will need a C++17 compiler (we test with GCC 7.3, GCC 8.3, and Clang
-7.0.1 on Linux, and Xcode 10.2 on Mac OS X) and Boost (we use 1.65.1 or later, built with threads
-enabled).
+Compilation of the solver can be done with the `make` command. This requires a C++17 compiler as well
+as Boost to be installed.
 
-Running
+Execution
 -------
 
-To run:
+To run the basic implementation to find a single isomorphism for pattern graph stored in `pattern-file`
+in a target graph stored in `target-file`
 
 ```shell session
 $ ./glasgow_subgraph_solver pattern-file target-file
 ```
 
-If you would like induced subgraph isomorphisms rather than non-induced (that is, if non-adjacent
-vertices must be mapped to non-adjacent vertices), you must request it:
-
+There are a wide variety of options which can be found by executing
 ```shell session
-$ ./glasgow_subgraph_solver --induced pattern-file target-file
+$ ./glasgow_subgraph_solver --help
 ```
 
-The default mode is to display the first found solution, or to prove unsatisfiability if no solution
-exists. To count or print all solutions, use one of:
+We list some commonly used options:
+1. --induced: Restrict algorithm to only find induced isomorphisms.
+2. --count-solutions: Count all solutions, instead of stopping at the first found solution.
+3. --print-all-solutions: Print all solutions found, if equivalence is used this will only print representative solutions.
+4. --pattern-equivalence: One of `none`, `structural`, indicates equivalence level on pattern.
+5. --target-equivalence: One of `none`, `structural`, `candidate`, `full`, or `node_cover`, indicates equivalence level on target.
+6. --format: Indicate the format used for the graph files.
 
-```shell session
-$ ./glasgow_subgraph_solver [ --count-solutions | --print-all-solutions ] pattern-file target-file
-```
+The solver currently only supports both pattern equivalence and target equivalence simultaneously
+if both are set to `structural`.
 
-Note that printing all solutions can be exponentially slower than counting solutions.
-
-The solver supports parallel search. Usually you should enable this, as follows:
-
-```shell session
-$ ./glasgow_subgraph_solver --parallel ...
-```
-
-Note that parallel search, in its default configuration, is non-deterministic.
-
-File Formats
+File Format
 ------------
 
-We try to auto-detect the input format, but it's best to specify it using, for example:
+The file format which is currently supported by this library for multiplex graph processing
+is the `csv` format. This format is given by listing each edge in comma-separated format
+as three fields: the name of the first node, the name of the second node, and the edge label.
+If the edge is to be directed, the first comma is to be replaced by a `>` symbol.
+In order to support multigraphs, each edge is repeated according to its multiplicity.
+To include node labels, you can put the node name in the first field, leave the second field
+blank, and put the node label in the third field.
 
-```shell session
-$ ./glasgow_subgraph_solver --format lad pattern-file target-file
+The following snippet adapted from the original Glasgow solver repository, demonstrates
+how to write in this format.
 ```
-
-In particular, note that auto-detection can easily fail if, for example, the first vertex in the
-graph has no neighbours.  We can read LAD, Labelled LAD (labels on vertices, and optionally also on
-edges), CSV, and DIMACS 2 formatted graphs. [The LAD
-format](https://perso.liris.cnrs.fr/christine.solnon/SIP.html) is a nice simple choice. If you need
-to support named vertices, labels on vertices and / or edges, or directed edges, consider using the
-CSV format. To specify a directed edge, use a greater-than sign rather than a comma as the delimiter
-between the first two columns.  To specify an edge label, include a third column in the file. To
-specify a vertex label, leave the second column empty and use the third column for the label. For
-example, the following describes a graph with four vertices, with colours for edge labels and shapes
-for vertex labels.
-
-```
+first>second,red
 first>second,red
 second>first,blue
 first,third,purple
@@ -84,137 +92,3 @@ third,,square
 fourth,,square
 ```
 
-Symmetries
-----------
-
-Symmetry elimination support is currently very experimental, only usable on pattern symmetries, and
-is probably only useful for solution counting. To use it, you must have the GAP computer algebra
-system in your PATH as 'gap', with the 'digraph' library installed. Then, do:
-
-```shell session
-$ ./glasgow_clique_solver --pattern-symmetries --count-solutions pattern-file target-file
-```
-
-Proof Logging
--------------
-
-As a highly experimental feature, the solver can output a proof log. First, install the following
-program:
-
-* VeriPB from https://github.com/StephanGocht/VeriPB/ .
-
-And then you can produce and verify a log like this:
-
-```shell session
-$ ./glasgow_subgraph_solver --no-supplementals --no-clique-detection --no-nds \
-    --prove myproof --proof-solutions pattern-file target-file
-$ veripb myproof.opb myproof.log
-```
-
-Note that most features are not yet supported with proof logging. This is a "not yet implemented"
-problem, not a fundamental restriction.
-
-Clique Solving
---------------
-
-To run the clique solver, use:
-
-```shell session
-$ ./glasgow_clique_solver graph-file
-```
-
-Details on the Algorithms
--------------------------
-
-The subgraph solver is a constraint programming style backtracker, which recursively builds up a
-mapping from pattern vertices to target vertices. It includes inference based upon paths (not just
-adjacency) and neighbourhood degree sequences, has a fast all-different propagator, and uses
-sophisticated variable- and value-ordering heuristics to direct a slightly-random restarting search.
-
-Chronologically, our first subgraph isomorphism solver is [cp/McCreeshP15]. We introduced new
-variants of this solver in [lion/KotthoffMS16], and described a refactored version (which can solve
-an optimisation variant of the problem) in [aaai/HoffmannMR17]. We also investigated search ordering
-heuristics in more detail in [jair/McCreeshPST18], and [cpaior/ArchibaldDHMPT19] describes its new
-restarting search algorithm. There is currently no paper describing the entire algorithm, but
-[icgt/McCreeshPT20] summarises the main aspects of it.
-
-The clique solver (with its default configuration) is a branch and bound solver that uses a greedy
-colouring both as the bound function, and as a branching heuristic. It is based upon the "domains of
-size two first" variant described in [cp/McCreeshP14], which is in turn derived from the "MCSa1"
-algorithm described by [algorithms/Prosser12] combined with the bit-parallelism techniques discussed
-by [ol/SegundoMRH13]; this in turn is a simplification of "MCS" described by [walcom/TomitaSHTW10].
-The solver also incorporates the fast clique detection technique described by [jco/BatsynGMP14].
-
-Funding Acknowledgements
-------------------------
-
-This work was supported by the Engineering and Physical Sciences Research Council (grant numbers
-EP/P026842/1, EP/M508056/1, and EP/N007565). This work used the Cirrus UK National Tier-2 HPC
-Service at EPCC (http://www.cirrus.ac.uk) funded by the University of Edinburgh and EPSRC
-(EP/P020267/1).
-
-References
-----------
-
-* [walcom/TomitaSHTW10]: https://dblp.org/rec/html/conf/walcom/TomitaSHTW10
-  **walcom/TomitaSHTW10**:
-  Etsuji Tomita, Yoichi Sutani, Takanori Higashi, Shinya Takahashi, Mitsuo Wakatsuki:
-  A Simple and Faster Branch-and-Bound Algorithm for Finding a Maximum Clique. WALCOM 2010: 191-203.
-  DBLP: [walcom/TomitaSHTW10]
-
-* [algorithms/Prosser12]: https://dblp.org/rec/html/journals/algorithms/Prosser12
-  **algorithms/Prosser12**:
-  Patrick Prosser: Exact Algorithms for Maximum Clique: A Computational Study. Algorithms 5(4):
-  545-587 (2012). DBLP: [algorithms/Prosser12].
-
-* [ol/SegundoMRH13]: https://dblp.org/rec/html/journals/ol/SegundoMRH13
-  **ol/SegundoMRH13**:
-  Pablo San Segundo, Fernando Matía, Diego Rodríguez-Losada, Miguel Hernando: An improved bit
-  parallel exact maximum clique algorithm. Optimization Letters 7(3): 467-479 (2013). DBLP:
-  [ol/SegundoMRH13].
-
-* [cp/McCreeshP14]: https://dblp.org/rec/html/conf/cp/McCreeshP14
-  **cp/McCreeshP14**:
-  Ciaran McCreesh, Patrick Prosser: Reducing the Branching in a Branch and Bound Algorithm for the
-  Maximum Clique Problem. CP 2014: 549-563. DBLP: [cp/McCreeshP14].
-
-* [jco/BatsynGMP14]: https://dblp.org/rec/html/journals/jco/BatsynGMP14
-  **jco/BatsynGMP14**:
-  Improvements to MCS algorithm for the maximum clique problem. J. Comb. Optim. 27(2): 397-416
-  (2014). DBLP: [jco/BatsynGMP14]
-
-* [cp/McCreeshP15]: https://dblp.org/rec/html/conf/cp/McCreeshP15
-  **cp/McCreeshP15**:
-  Ciaran McCreesh, Patrick Prosser: A Parallel, Backjumping Subgraph Isomorphism Algorithm Using
-  Supplemental Graphs. CP 2015: 295-312. DBLP: [cp/McCreeshP15].
-
-* [lion/KotthoffMS16]: https://dblp.org/rec/html/conf/lion/KotthoffMS16
-  **lion/KotthoffMS16**:
-  Lars Kotthoff, Ciaran McCreesh, Christine Solnon: Portfolios of Subgraph Isomorphism Algorithms.
-  LION 2016: 107-122. DBLP: [lion/KotthoffMS16].
-
-* [aaai/HoffmannMR17]: https://dblp.org/rec/html/conf/aaai/HoffmannMR17
-  **aaai/HoffmannMR17**:
-  Ruth Hoffmann, Ciaran McCreesh, Craig Reilly: Between Subgraph Isomorphism and Maximum Common
-  Subgraph. AAAI 2017: 3907-3914. DBLP: [aaai/HoffmannMR17].
-
-* [jair/McCreeshPST18]: https://dblp.org/rec/html/journals/jair/McCreeshPST18
-  **jair/McCreeshPST18**:
-  Ciaran McCreesh, Patrick Prosser, Christine Solnon, James Trimble: When Subgraph Isomorphism is
-  Really Hard, and Why This Matters for Graph Databases. J. Artif. Intell. Res. 61: 723-759 (2018).
-  DBLP: [jair/McCreeshPST18].
-
-* [cpaior/ArchibaldDHMPT19]: http://dblp.org/rec/html/conf/cpaior/ArchibaldDHMP019
-  **cpaior/ArchibaldDHMPT19**:
-  Blair Archibald, Fraser Dunlop, Ruth Hoffmann, Ciaran McCreesh, Patrick Prosser and James Trimble:
-  Sequential and Parallel Solution-Biased Search for Subgraph Algorithms. CPAIOR 2019: 20-38.
-  DBLP: [cpaior/ArchibaldDHMPT19].
-
-* [icgt/McCreeshPT20]: http://dblp.org/rec/html/conf/gg/McCreeshP020
-  **icgt/McCreeshP020**:
-  Ciaran McCreesh, Patrick Prosser, James Trimble:
-  The Glasgow Subgraph Solver: Using Constraint Programming to Tackle Hard Subgraph Isomorphism
-  Problem Variants. ICGT 2020: 316-324.
-  DBLP: [icgt/McCreeshPT20].
-
-<!-- vim: set tw=100 spell spelllang=en : -->
